@@ -1,0 +1,221 @@
+{
+  "schema_version": 2,
+  "required_capabilities": [
+    "custom_pages"
+  ],
+  "workspace_title": "办公文件",
+  "pages": [
+    {
+      "id": "console",
+      "title": "办公文件工具箱",
+      "description": "浏览工作区文件、预览 Word/Excel/PPT/PDF，用一句自然语言让 AI 解析成操作并执行，生成文档后发送到当前对话。",
+      "placement": "sidebar",
+      "icon": "list",
+      "mode": "custom",
+      "entry": "webui/index.html",
+      "layout": "viewport",
+      "queries": {
+        "status": {
+          "api": "toolkit_status",
+          "version": "1"
+        },
+        "files": {
+          "api": "list_files",
+          "version": "1",
+          "parameters": {
+            "keyword": {
+              "type": "string",
+              "required": false,
+              "max_length": 200
+            }
+          }
+        },
+        "read": {
+          "api": "read_file",
+          "version": "1",
+          "parameters": {
+            "path": {
+              "type": "string",
+              "required": true,
+              "max_length": 1024
+            },
+            "limit": {
+              "type": "integer",
+              "required": false,
+              "minimum": 0,
+              "maximum": 20000
+            }
+          }
+        },
+        "dsh": {
+          "api": "dsh_files",
+          "version": "1"
+        },
+        "inbox": {
+          "api": "inbox_list",
+          "version": "1",
+          "parameters": {
+            "keyword": {
+              "type": "string",
+              "required": false,
+              "max_length": 200
+            }
+          }
+        },
+        "ops": {
+          "api": "ops_catalog",
+          "version": "1"
+        },
+        "aiStatus": {
+          "api": "ai_status",
+          "version": "1",
+          "parameters": {
+            "job_id": {
+              "type": "string",
+              "required": true,
+              "max_length": 64
+            }
+          }
+        }
+      },
+      "actions": {
+        "createDocument": {
+          "api": "create_document",
+          "version": "1",
+          "parameters": {
+            "kind": {
+              "type": "string",
+              "required": true,
+              "choices": [
+                "docx",
+                "xlsx",
+                "pptx"
+              ]
+            },
+            "name": {
+              "type": "string",
+              "required": true,
+              "max_length": 120
+            },
+            "content": {
+              "type": "string",
+              "required": false,
+              "max_length": 60000
+            },
+            "title": {
+              "type": "string",
+              "required": false,
+              "max_length": 200
+            }
+          }
+        },
+        "zip": {
+          "api": "zip_files",
+          "version": "1",
+          "parameters": {
+            "name": {
+              "type": "string",
+              "required": true,
+              "max_length": 120
+            },
+            "paths": {
+              "type": "string",
+              "required": true,
+              "max_length": 8000
+            }
+          }
+        },
+        "unzip": {
+          "api": "unzip_file",
+          "version": "1",
+          "parameters": {
+            "path": {
+              "type": "string",
+              "required": true,
+              "max_length": 1024
+            },
+            "dest": {
+              "type": "string",
+              "required": false,
+              "max_length": 1024
+            }
+          }
+        },
+        "send": {
+          "api": "send_file",
+          "version": "1",
+          "parameters": {
+            "path": {
+              "type": "string",
+              "required": true,
+              "max_length": 1024
+            },
+            "stream_id": {
+              "type": "string",
+              "required": false,
+              "max_length": 200
+            }
+          }
+        },
+        "remove": {
+          "api": "delete_file",
+          "version": "1",
+          "parameters": {
+            "path": {
+              "type": "string",
+              "required": true,
+              "max_length": 1024
+            }
+          }
+        },
+        "inboxGet": {
+          "api": "inbox_get",
+          "version": "1",
+          "parameters": {
+            "ref": {
+              "type": "string",
+              "required": true,
+              "max_length": 200
+            }
+          }
+        },
+        "diff": {
+          "api": "diff_files",
+          "version": "1",
+          "parameters": {
+            "left": {
+              "type": "string",
+              "required": true,
+              "max_length": 1024
+            },
+            "right": {
+              "type": "string",
+              "required": true,
+              "max_length": 1024
+            }
+          }
+        },
+        "ai": {
+          "api": "office_ai",
+          "version": "1",
+          "parameters": {
+            "instruction": {
+              "type": "string",
+              "required": true,
+              "max_length": 2000
+            },
+            "dry_run": {
+              "type": "boolean",
+              "required": false
+            },
+            "stream_id": {
+              "type": "string",
+              "required": false,
+              "max_length": 200
+            }
+          }
+        }
+      }
+    }
+  ]
+}

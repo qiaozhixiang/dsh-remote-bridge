@@ -1,0 +1,47 @@
+# 办公文件工具箱 —— 分发包默认配置
+# 安装后按需修改：工作区目录、白名单 QQ 号。
+
+[plugin]
+enabled = true
+config_version = "1.2.4"
+
+[storage]
+# 生成文件的工作区；留空 = <插件数据目录>/files
+workspace = ""
+# 只允许操作这些目录下的文件；留空表示不限制（仍会拒绝 .ssh/.git 等敏感目录）
+allowed_roots = []
+max_size_mb = 50
+
+[documents]
+preview_chars = 1500
+max_rows = 500
+max_paragraphs = 800
+
+[whitelist]
+enabled = true
+qq_numbers = []
+admins = []
+ignore_others = true
+max_reply_chars = 1500
+
+[integration]
+dsh_enabled = true
+dsh_plugin_id = "github.qiaozhixiang.dsh-remote-bridge"
+
+[inbox]
+enabled = true
+auto_capture = true
+max_items = 2000
+max_file_mb = 50
+download_proxy = ""
+auto_import = false
+
+[ai]
+enabled = true
+model = ""
+temperature = 0.2
+max_steps = 12
+allow_delete = false
+dry_run = false
+# 调用大模型的最长等待（秒）；复杂指令可调到 90~180
+llm_timeout_seconds = 120.0

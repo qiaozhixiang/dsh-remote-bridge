@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>办公文件工具箱</title>
+<style>
+  :root {
+    --bg: #f6f7fb;
+    --panel: #ffffff;
+    --line: #e3e7f0;
+    --text: #1f2430;
+    --muted: #6b7280;
+    --accent: #4f6bed;
+    --accent-soft: #eef2ff;
+    --ok: #0f9d58;
+    --err: #d93025;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+    background: var(--bg); color: var(--text); font-size: 13px;
+    display: flex; flex-direction: column;
+  }
+  header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 16px; background: var(--panel);
+    border-bottom: 1px solid var(--line);
+  }
+  header h1 { font-size: 15px; margin: 0; font-weight: 600; }
+  .meta { color: var(--muted); font-size: 12px; }
+  .spacer { flex: 1; }
+  button {
+    border: 1px solid var(--line); background: var(--panel); color: var(--text);
+    border-radius: 8px; padding: 6px 12px; cursor: pointer; font-size: 12px;
+    transition: background .15s, border-color .15s;
+  }
+  button:hover:not(:disabled) { background: var(--accent-soft); border-color: #c7d2fe; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary:hover:not(:disabled) { background: #4059d6; }
+  button.danger { color: var(--err); }
+  main { flex: 1; display: flex; min-height: 0; }
+  .pane-left {
+    width: 300px; min-width: 220px; background: var(--panel);
+    border-right: 1px solid var(--line); display: flex; flex-direction: column;
+  }
+  .pane-right { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .bar { padding: 10px 12px; border-bottom: 1px solid var(--line); display: flex; gap: 8px; }
+  .bar input {
+    flex: 1; border: 1px solid var(--line); border-radius: 8px;
+    padding: 6px 10px; font-size: 12px; outline: none;
+  }
+  .bar input:focus { border-color: var(--accent); }
+  .list { flex: 1; overflow: auto; padding: 6px; }
+  .item {
+    padding: 8px 10px; border-radius: 8px; cursor: pointer;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .item:hover { background: #f2f4fa; }
+  .item.active { background: var(--accent-soft); }
+  .item .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .item .size { color: var(--muted); font-size: 11px; }
+  .badge {
+    display: inline-block; padding: 1px 6px; border-radius: 6px;
+    background: var(--accent-soft); color: var(--accent); font-size: 11px;
+  }
+  .preview-head {
+    padding: 10px 16px; border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; gap: 10px; background: var(--panel);
+  }
+  .preview-head .title { font-weight: 600; }
+  pre.preview {
+    flex: 1; margin: 0; padding: 16px; overflow: auto; white-space: pre-wrap;
+    word-break: break-word; font-family: "Cascadia Mono", Consolas, monospace;
+    font-size: 12px; line-height: 1.6; background: var(--panel);
+  }
+  .empty { color: var(--muted); padding: 24px; text-align: center; }
+  .banner {
+    position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%);
+    padding: 8px 16px; border-radius: 10px; color: #fff; font-size: 12px;
+    background: #333; opacity: 0; pointer-events: none; transition: opacity .2s;
+    max-width: 80%;
+  }
+  .banner.show { opacity: .95; }
+  .banner.ok { background: var(--ok); }
+  .banner.err { background: var(--err); }
+  .mask {
+    position: fixed; inset: 0; background: rgba(17, 24, 39, .45);
+    display: none; align-items: center; justify-content: center; z-index: 20;
+  }
+  .mask.show { display: flex; }
+  .dialog {
+    width: 520px; max-width: calc(100vw - 32px); background: var(--panel);
+    border-radius: var(--radius); padding: 18px; box-shadow: 0 18px 50px rgba(0,0,0,.2);
+  }
+  .dialog h2 { margin: 0 0 12px; font-size: 14px; }
+  .field { margin-bottom: 10px; }
+  .field label { display: block; margin-bottom: 4px; color: var(--muted); font-size: 12px; }
+  .field input, .field select, .field textarea {
+    width: 100%; border: 1px solid var(--line); border-radius: 8px;
+    padding: 8px 10px; font-size: 12px; font-family: inherit; outline: none;
+  }
+  .field textarea { min-height: 140px; resize: vertical; font-family: Consolas, monospace; }
+  .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); }
+  .dialog-foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+  .hint { color: var(--muted); font-size: 11px; margin-top: 4px; }
+  .ai-bar {
+    display: flex; gap: 8px; align-items: center; padding: 10px 16px;
+    background: var(--panel); border-bottom: 1px solid var(--line);
+  }
+  .ai-bar input {
+    flex: 1; border: 1px solid var(--line); border-radius: 8px;
+    padding: 8px 10px; font-size: 12px; outline: none;
+  }
+  .ai-bar input:focus { border-color: var(--accent); }
+  .ai-result {
+    margin: 0; padding: 10px 16px; background: #0f172a; color: #e2e8f0;
+    font-family: Consolas, monospace; font-size: 12px; white-space: pre-wrap;
+    max-height: 220px; overflow: auto; border-bottom: 1px solid var(--line);
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>办公文件工具箱</h1>
+  <span class="meta" id="meta">正在连接…</span>
+  <span class="spacer"></span>
+  <button id="btn-inbox">收件箱</button>
+  <button id="btn-dsh">DSH 文件</button>
+  <button id="btn-new" class="primary">新建文档</button>
+  <button id="btn-refresh">刷新</button>
+</header>
+
+<div class="ai-bar">
+  <input id="ai-input" placeholder="用一句话说明要做什么，例如：把成绩单里不及格的挑出来发给我" />
+  <button id="btn-ai" class="primary">执行</button>
+  <button id="btn-ai-dry" title="只解析出操作计划，不真正执行">预览计划</button>
+  <button id="btn-ops" title="查看支持的全部操作">支持的操作</button>
+</div>
+<pre class="ai-result" id="ai-result" hidden></pre>
+
+<main>
+  <section class="pane-left">
+    <div class="bar">
+      <input id="search" type="search" placeholder="搜索文件名…" />
+    </div>
+    <div class="list" id="file-list">
+      <div class="empty">正在加载…</div>
+    </div>
+  </section>
+  <section class="pane-right">
+    <div class="preview-head">
+      <span class="title" id="preview-title">未选择文件</span>
+      <span class="badge" id="preview-kind" hidden></span>
+      <span class="spacer"></span>
+      <button id="btn-send" disabled>发送到对话</button>
+      <button id="btn-delete" class="danger" disabled>删除</button>
+    </div>
+    <pre class="preview" id="preview">从左侧选择一个文件查看内容。</pre>
+  </section>
+</main>
+
+<div class="mask" id="mask">
+  <div class="dialog">
+    <h2>新建文档</h2>
+    <div class="field">
+      <label>类型</label>
+      <select id="dlg-kind">
+        <option value="docx">Word（docx）</option>
+        <option value="xlsx">Excel（xlsx）</option>
+        <option value="pptx">PowerPoint（pptx）</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>文件名</label>
+      <input id="dlg-name" placeholder="例如：周报" />
+    </div>
+    <div class="field">
+      <label>内容</label>
+      <textarea id="dlg-content" placeholder="Word：# 标题 / - 列表 / 正文&#10;Excel：姓名,年龄;张三,20&#10;PPT：封面|要点;;第二页|要点1|要点2"></textarea>
+      <div class="hint" id="dlg-hint">Word 用换行分段；Excel 用 ; 分行、, 分列；PPT 用 ;; 分页、| 分标题与要点。</div>
+    </div>
+    <div class="dialog-foot">
+      <button id="dlg-cancel">取消</button>
+      <button id="dlg-ok" class="primary">生成</button>
+    </div>
+  </div>
+</div>
+
+<div class="banner" id="banner"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  var api = window.maibot || null;
+  var state = { files: [], selected: null, busy: false };
+
+  function $(id) { return document.getElementById(id); }
+
+  function banner(kind, text) {
+    var el = $("banner");
+    el.className = "banner show " + (kind || "");
+    el.textContent = text || "";
+    clearTimeout(banner._timer);
+    banner._timer = setTimeout(function () { el.className = "banner"; }, 3200);
+  }
+
+  function fmtSize(value) {
+    var size = Number(value || 0);
+    if (size < 1024) return size + " B";
+    if (size < 1024 * 1024) return (size / 1024).toFixed(1) + " KB";
+    return (size / 1024 / 1024).toFixed(1) + " MB";
+  }
+
+  function setBusy(flag) {
+    state.busy = !!flag;
+    ["btn-new", "btn-refresh", "btn-send", "btn-delete", "btn-dsh", "btn-inbox", "btn-ai", "btn-ai-dry", "btn-ops"].forEach(function (id) {
+      var el = $(id);
+      if (el) el.disabled = !!flag;
+    });
+    if (!flag) updateSelectionButtons();
+  }
+
+  function updateSelectionButtons() {
+    var has = !!state.selected;
+    $("btn-send").disabled = !has || state.busy;
+    $("btn-delete").disabled = !has || state.busy;
+  }
+
+  function renderFiles() {
+    var host = $("file-list");
+    host.innerHTML = "";
+    if (!state.files.length) {
+      var empty = document.createElement("div");
+      empty.className = "empty";
+      empty.textContent = "工作区里还没有文件，点右上角「新建文档」。";
+      host.appendChild(empty);
+      return;
+    }
+    state.files.forEach(function (item) {
+      var row = document.createElement("div");
+      row.className = "item" + (state.selected && state.selected.path === item.path ? " active" : "");
+      var name = document.createElement("span");
+      name.className = "name";
+      name.textContent = item.name;
+      var size = document.createElement("span");
+      size.className = "size";
+      size.textContent = item.size_text || fmtSize(item.size);
+      row.appendChild(name);
+      row.appendChild(size);
+      row.addEventListener("click", function () { selectFile(item); });
+      host.appendChild(row);
+    });
+  }
+
+  async function loadStatus() {
+    try {
+      var status = await api.query("status", {});
+      if (status && status.ok) {
+        $("meta").textContent = status.workspace + " · " + status.files + " 个文件";
+      }
+    } catch (err) {
+      $("meta").textContent = "状态读取失败";
+    }
+  }
+
+  async function loadFiles(keyword) {
+    try {
+      var result = await api.query("files", { keyword: keyword || "" });
+      state.files = (result && result.items) || [];
+      renderFiles();
+      if (result && result.workspace) {
+        $("meta").textContent = result.workspace + " · " + state.files.length + " 个文件";
+      }
+    } catch (err) {
+      banner("err", "读取文件列表失败：" + (err && err.message ? err.message : err));
+    }
+  }
+
+  async function selectFile(item) {
+    if (item.inbox) {
+      setBusy(true);
+      try {
+        var got = await api.action("inboxGet", { ref: item.inbox });
+        banner("ok", "已复制到工作区：" + (got && got.name ? got.name : item.name));
+        await loadFiles($("search").value.trim());
+      } catch (err) {
+        banner("err", "复制失败：" + (err && err.message ? err.message : err));
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+    state.selected = item;
+    renderFiles();
+    updateSelectionButtons();
+    $("preview-title").textContent = item.name;
+    $("preview-kind").hidden = false;
+    $("preview-kind").textContent = item.kind_label || item.kind || "";
+    $("preview").textContent = "正在读取…";
+    try {
+      var result = await api.query("read", { path: item.path, limit: 4000 });
+      $("preview").textContent = (result && result.preview) || "（没有内容）";
+    } catch (err) {
+      $("preview").textContent = "读取失败：" + (err && err.message ? err.message : err);
+    }
+  }
+
+  async function sendSelected() {
+    if (!state.selected) return;
+    setBusy(true);
+    try {
+      var result = await api.action("send", { path: state.selected.path, stream_id: "" });
+      if (result && result.ok) banner("ok", "已发送：" + state.selected.name);
+      else banner("err", "发送失败，宿主未确认");
+    } catch (err) {
+      banner("err", "发送失败：" + (err && err.message ? err.message : err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function deleteSelected() {
+    if (!state.selected) return;
+    if (!window.confirm("确定要删除 " + state.selected.name + " 吗？")) return;
+    setBusy(true);
+    try {
+      await api.action("remove", { path: state.selected.path });
+      banner("ok", "已删除");
+      state.selected = null;
+      $("preview-title").textContent = "未选择文件";
+      $("preview-kind").hidden = true;
+      $("preview").textContent = "从左侧选择一个文件查看内容。";
+      await loadFiles($("search").value.trim());
+    } catch (err) {
+      banner("err", "删除失败：" + (err && err.message ? err.message : err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function createDocument() {
+    var kind = $("dlg-kind").value;
+    var name = $("dlg-name").value.trim();
+    var content = $("dlg-content").value;
+    if (!name) { banner("err", "请填写文件名"); return; }
+    setBusy(true);
+    try {
+      var result = await api.action("createDocument", { kind: kind, name: name, content: content, title: "" });
+      $("mask").className = "mask";
+      banner("ok", "已生成：" + (result && result.name ? result.name : name));
+      $("dlg-name").value = "";
+      $("dlg-content").value = "";
+      await loadFiles($("search").value.trim());
+    } catch (err) {
+      banner("err", "生成失败：" + (err && err.message ? err.message : err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function showInbox() {
+    setBusy(true);
+    try {
+      var result = await api.query("inbox", { keyword: "" });
+      var items = (result && result.items) || [];
+      if (!items.length) {
+        banner("err", "收件箱是空的：在群里或私聊发个文件试试");
+        return;
+      }
+      state.files = items.map(function (item) {
+        return {
+          name: item.name,
+          path: "inbox:" + item.index,
+          inbox: "#" + item.index,
+          size: item.size,
+          size_text: item.size_text || fmtSize(item.size),
+          kind_label: "收件箱 · " + (item.sender || "未知")
+        };
+      });
+      renderFiles();
+      banner("ok", "收件箱共 " + (result.count || items.length) + " 个文件，点击即可复制到工作区");
+    } catch (err) {
+      banner("err", "读取收件箱失败：" + (err && err.message ? err.message : err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function showDshFiles() {
+    setBusy(true);
+    try {
+      var result = await api.query("dsh", {});
+      var items = (result && result.items) || [];
+      if (!items.length) {
+        banner("err", "没有读到 DSH 会话里的文件");
+        return;
+      }
+      state.files = items.map(function (item) {
+        return {
+          name: item.name,
+          path: item.path,
+          size: item.size,
+          size_text: item.size_text || fmtSize(item.size),
+          kind: item.kind || "",
+          kind_label: item.kind_label || ""
+        };
+      });
+      renderFiles();
+      banner("ok", "已载入 " + items.length + " 个 DSH 文件");
+    } catch (err) {
+      banner("err", "读取 DSH 文件失败：" + (err && err.message ? err.message : err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function renderAiResult(data) {
+    var box = $("ai-result");
+    box.hidden = false;
+    if (!data || !data.ok) {
+      box.textContent = (data && (data.message || data.error)) || "执行失败";
+      banner("err", "执行失败");
+      return;
+    }
+    if (data.dry_run) {
+      box.textContent = (data.source ? "（" + data.source + "解析）\n" : "") + (data.summary || "");
+      banner("ok", "已解析出操作计划");
+      return;
+    }
+    var lines = [];
+    lines.push("执行结果：" + (data.summary ? data.summary.split("\n")[0] : "完成"));
+    (data.logs || []).forEach(function (item) { lines.push("· " + item); });
+    (data.previews || []).forEach(function (item) { lines.push(""); lines.push(item); });
+    if ((data.sent || []).length) { lines.push(""); lines.push("已发送：" + data.sent.join("、")); }
+    box.textContent = lines.join("\n");
+    banner("ok", "已完成");
+  }
+
+  async function pollAi(jobId, tries) {
+    var box = $("ai-result");
+    for (var i = 0; i < tries; i++) {
+      await new Promise(function (r) { setTimeout(r, 1500); });
+      var data = await api.query("aiStatus", { job_id: jobId });
+      if (data && data.state === "running") {
+        box.textContent = "正在执行…（" + (i + 1) * 1.5 + " 秒）";
+        continue;
+      }
+      renderAiResult((data && data.result) || data);
+      await loadStatus();
+      await loadFiles($("search").value.trim());
+      return;
+    }
+    box.textContent = "指令还在执行，稍后点「刷新」查看结果。";
+    banner("err", "等待超时");
+  }
+
+  async function runAi(dry) {
+    var text = $("ai-input").value.trim();
+    if (!text) { banner("err", "先输入一句话指令"); return; }
+    var box = $("ai-result");
+    box.hidden = false;
+    box.textContent = dry ? "正在解析计划…" : "正在执行…";
+    setBusy(true);
+    try {
+      var data = await api.action("ai", { instruction: text, dry_run: !!dry });
+      if (data && data.pending && data.job_id) {
+        box.textContent = data.message || "已提交，正在执行…";
+        await pollAi(data.job_id, 40);
+        return;
+      }
+      renderAiResult(data);
+      await loadStatus();
+      await loadFiles($("search").value.trim());
+    } catch (err) {
+      box.textContent = "执行失败：" + (err && err.message ? err.message : err);
+      banner("err", "执行失败");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function showOps() {
+    var box = $("ai-result");
+    box.hidden = false;
+    box.textContent = "读取中…";
+    try {
+      var data = await api.query("ops", {});
+      box.textContent = (data && data.text) || "（没有可用的操作说明）";
+    } catch (err) {
+      box.textContent = "读取失败：" + (err && err.message ? err.message : err);
+    }
+  }
+
+  function bind() {
+    $("btn-refresh").addEventListener("click", function () { loadFiles($("search").value.trim()); });
+    $("btn-send").addEventListener("click", sendSelected);
+    $("btn-delete").addEventListener("click", deleteSelected);
+    $("btn-dsh").addEventListener("click", showDshFiles);
+    $("btn-inbox").addEventListener("click", showInbox);
+    $("btn-ai").addEventListener("click", function () { runAi(false); });
+    $("btn-ai-dry").addEventListener("click", function () { runAi(true); });
+    $("btn-ops").addEventListener("click", showOps);
+    $("ai-input").addEventListener("keydown", function (event) {
+      if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); runAi(false); }
+    });
+    $("btn-new").addEventListener("click", function () { $("mask").className = "mask show"; });
+    $("dlg-cancel").addEventListener("click", function () { $("mask").className = "mask"; });
+    $("dlg-ok").addEventListener("click", createDocument);
+    $("dlg-kind").addEventListener("change", function () {
+      var kind = $("dlg-kind").value;
+      $("dlg-hint").textContent = kind === "docx"
+        ? "Word：用换行分段；# 一级标题，## 二级标题，- 列表，| a | b | 表格。"
+        : kind === "xlsx"
+          ? "Excel：用 ; 分行，, 分列。例如：姓名,年龄;张三,20"
+          : "PPT：用 ;; 分页，| 分标题与要点。例如：封面|要点;;第二页|要点1|要点2";
+    });
+    var timer = null;
+    $("search").addEventListener("input", function () {
+      clearTimeout(timer);
+      timer = setTimeout(function () { loadFiles($("search").value.trim()); }, 250);
+    });
+  }
+
+  async function boot() {
+    if (!api) {
+      $("meta").textContent = "请在 MaiBot 的插件扩展页面打开";
+      return;
+    }
+    try { await api.ready; } catch (err) { /* 兼容旧宿主 */ }
+    bind();
+    updateSelectionButtons();
+    await loadStatus();
+    await loadFiles("");
+  }
+
+  boot();
+})();
+</script>
+</body>
+</html>
