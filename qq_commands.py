@@ -418,7 +418,8 @@ class QqCommandMixin:
         lines.append(f"新建会话预设：{preset or '未指定（跟随 DSH 默认）'}")
         tunnel = self._tunnel_manager.status()
         if tunnel.get("running"):
-            lines.append(f"公网隧道：{tunnel.get('public_url')}")
+            # 公网地址只在用户显式执行 /dsh tunnel 时给出，状态汇总里不主动外泄
+            lines.append("公网隧道：运行中（地址用 /dsh tunnel 查）")
         await self._qq_send(stream_id, "\n".join(lines))
 
     async def _dsh_whoami(self, user_id: str, stream_id: str, rest: str, is_local: bool) -> None:

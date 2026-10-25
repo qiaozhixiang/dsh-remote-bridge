@@ -146,7 +146,7 @@ class PluginSectionConfig(PluginConfigBase):
     __ui_order__ = 0
 
     enabled: bool = Field(default=True, description="是否启用插件")
-    config_version: str = Field(default="1.6.3", description="配置版本")
+    config_version: str = Field(default="1.6.4", description="配置版本")
 
 
 class ConnectionConfig(PluginConfigBase):
@@ -236,7 +236,7 @@ class FilesConfig(PluginConfigBase):
     max_size_mb: int = Field(default=25, description="单个文件大小上限（MB），超过不投递")
     allowed_roots: List[str] = Field(
         default_factory=list,
-        description="只投递这些目录下的文件；留空表示不限（凭据目录始终排除）",
+        description="只投递这些目录下的文件；留空表示只允许插件数据目录（凭据/系统目录始终排除）",
     )
 
 
@@ -557,6 +557,7 @@ class DshRemoteBridgePlugin(QqCommandMixin, MaiBotPlugin):
             max_files=max(1, min(20, int(cfg.max_files or 5))),
             max_bytes=max(1, int(cfg.max_size_mb or 25)) * 1024 * 1024,
             allowed_roots=list(cfg.allowed_roots or []),
+            fallback_roots=[self._data_dir()],
         )
 
     async def _deliver_files(self, stream_id: str, files: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -589,6 +590,14 @@ class DshRemoteBridgePlugin(QqCommandMixin, MaiBotPlugin):
 
     def _qq_state_path(self) -> Path:
         return Path(self.ctx.paths.data_dir) / "qq_state.json"
+
+    def _data_dir(self) -> str:
+        """插件数据目录；``files.allowed_roots`` 留空时的默认投递范围。"""
+
+        try:
+            return str(Path(self.ctx.paths.data_dir))
+        except Exception:  # noqa: BLE001
+            return ""
 
     def _load_qq_state(self) -> None:
         path = self._qq_state_path()
@@ -633,11 +642,35 @@ class DshRemoteBridgePlugin(QqCommandMixin, MaiBotPlugin):
             return str(mapping.get((session_id or "").strip()) or "")
         return ""
 
+    @staticmethod
+    def _same_origin(left: str, right: str) -> bool:
+        """两个地址是否同源（协议 + 主机 + 端口）。"""
+
+        try:
+            a, b = urlsplit(left or ""), urlsplit(right or "")
+        except ValueError:
+            return False
+        if not a.hostname or not b.hostname:
+            return False
+
+        def port(part: Any) -> int:
+            if part.port:
+                return int(part.port)
+            return 443 if part.scheme == "https" else 80
+
+        return (a.scheme, a.hostname.casefold(), port(a)) == (b.scheme, b.hostname.casefold(), port(b))
+
     def _build_bridge(self, cfg: ConnectionConfig) -> DshBridge:
         target = self._endpoint_override or cfg.base_url
+        token = cfg.token
+        if token and not self._same_origin(target, cfg.base_url):
+            self.ctx.logger.warning(
+                "目标地址 %s 与配置的 DSH 地址 %s 不同源，本次连接不携带访问令牌", target, cfg.base_url
+            )
+            token = ""
         client = DshClient(
             target,
-            token=cfg.token,
+            token=token,
             timeout=cfg.timeout_seconds,
             verify_tls=cfg.verify_tls,
             proxy=_proxy_for(target, cfg.http_proxy),
@@ -1075,12 +1108,14 @@ class DshRemoteBridgePlugin(QqCommandMixin, MaiBotPlugin):
             return {"ok": False, "error": {"code": "files/not-found", "message": "文件不存在或不是普通文件", "details": {"path": path}}}
         if _files_module.is_denied(target):
             return {"ok": False, "error": {"code": "files/denied", "message": "该目录不允许投递", "details": {"path": str(target)}}}
-        if not _files_module.is_allowed_root(target, cfg.allowed_roots or []):
+        if not _files_module.is_allowed_root(
+            target, cfg.allowed_roots or [], fallback_roots=[self._data_dir()]
+        ):
             return {
                 "ok": False,
                 "error": {
                     "code": "files/outside-roots",
-                    "message": "该文件不在 files.allowed_roots 允许的目录里",
+                    "message": "该文件不在允许投递的目录里（files.allowed_roots，留空时只允许插件数据目录）",
                     "details": {"path": str(target), "allowed_roots": list(cfg.allowed_roots or [])},
                 },
             }
@@ -1155,9 +1190,13 @@ class DshRemoteBridgePlugin(QqCommandMixin, MaiBotPlugin):
     async def test_connection(self, base_url: str = "") -> Dict[str, Any]:
         target = normalize_base_url(base_url or self._connection_config().base_url)
         connection = self._connection_config()
+        token = connection.token
+        if token and not self._same_origin(target, connection.base_url):
+            # 探活可以打任意地址，但不把访问令牌发到非同源主机
+            token = ""
         client = DshClient(
             target,
-            token=connection.token,
+            token=token,
             timeout=connection.timeout_seconds,
             verify_tls=connection.verify_tls,
             proxy=_proxy_for(target, connection.http_proxy),
@@ -1170,7 +1209,12 @@ class DshRemoteBridgePlugin(QqCommandMixin, MaiBotPlugin):
             return self._fail(exc)
         finally:
             await client.close()
-        return self._ok(base_url=target, **info, elapsed_ms=round((time.perf_counter() - started) * 1000.0, 1))
+        return self._ok(
+            base_url=target,
+            auth_sent=bool(token),
+            **info,
+            elapsed_ms=round((time.perf_counter() - started) * 1000.0, 1),
+        )
 
     # ------------------------------------------------------- 隧道 / 白名单 API
 

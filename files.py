@@ -10,7 +10,6 @@ DSH 的回答本身只是一段文本，但它调用工具（写文件、导出�
 
 from __future__ import annotations
 
-import base64
 import mimetypes
 import os
 import re
@@ -31,12 +30,70 @@ _DENY_PARTS = {
     ".gnupg",
     ".aws",
     ".azure",
+    ".kube",
+    ".docker",
+    ".gcloud",
+    ".password-store",
+    ".mozilla",
+    ".thunderbird",
+    ".config",
     ".git",
+    ".hg",
+    ".svn",
+    ".aws-sso",
     "__pycache__",
     "node_modules",
+    ".venv",
+    "venv",
+    "site-packages",
     "cookies",
     "login data",
 }
+
+# 系统目录：命中这些前缀的一律不投递
+_DENY_PREFIXES = (
+    "/etc",
+    "/proc",
+    "/sys",
+    "/dev",
+    "/boot",
+    "/root",
+    "/bin",
+    "/sbin",
+    "/usr/bin",
+    "/usr/sbin",
+    "/var/lib",
+    "/private/etc",
+    "/private/var/db",
+)
+
+# Windows 系统盘目录
+_DENY_WIN_PREFIX = re.compile(
+    r"^[a-z]:/(?:windows|program files|program files \(x86\)|programdata)(?:/|$)"
+)
+
+# 文件名/后缀黑名单：凭据、密钥、浏览器保存的密码、shell 历史等
+_DENY_NAME = re.compile(
+    r"(?:^\.?netrc$"
+    r"|^\.npmrc$"
+    r"|^\.pypirc$"
+    r"|^\.pgpass$"
+    r"|^\.git-credentials$"
+    r"|^\.htpasswd$"
+    r"|^id_(?:rsa|dsa|ecdsa|ed25519)(?:\.pub)?$"
+    r"|^\.env(?:\..*)?$"
+    r"|^\.bash_history$"
+    r"|^\.zsh_history$"
+    r"|^\.psql_history$"
+    r"|^credentials(?:\.json)?$"
+    r"|^config\.json$"
+    r"|^logins\.json$"
+    r"|^key[34]\.db$"
+    r"|^cookies\.sqlite$"
+    r"|^local state$"
+    r"|token|secret|passwd|password|credential"
+    r"|\.pem$|\.key$|\.pfx$|\.p12$|\.jks$|\.keystore$|\.kdbx$|\.ppk$)"
+)
 
 _IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"}
 
@@ -94,10 +151,42 @@ def normalize_path(raw: str) -> Optional[Path]:
 
 
 def is_denied(path: Path) -> bool:
-    """命中凭据/缓存目录的一律不投递。"""
+    """命中凭据/缓存/系统目录或敏感文件名的一律不投递。"""
 
-    parts = {part.casefold() for part in path.parts}
-    return bool(parts & _DENY_PARTS)
+    try:
+        resolved = Path(path).resolve()
+    except (OSError, RuntimeError):
+        resolved = Path(path)
+
+    parts = {part.casefold() for part in resolved.parts}
+    if parts & _DENY_PARTS:
+        return True
+
+    text = str(resolved).replace("\\", "/").casefold()
+    variants = [text]
+    stripped = re.sub(r"^[a-z]:/", "", text)
+    if stripped != text:
+        # Windows 上 "/etc/shadow" 这类写法会解析成 "C:/etc/shadow"，同样按系统路径处理
+        variants.append("/" + stripped)
+    for candidate in variants:
+        for prefix in _DENY_PREFIXES:
+            if candidate == prefix or candidate.startswith(prefix + "/"):
+                return True
+    if _DENY_WIN_PREFIX.match(text):
+        return True
+
+    name = resolved.name.casefold()
+    if _DENY_NAME.search(name):
+        return True
+
+    # 用户主目录下的点文件（.bashrc、.gitconfig 等）一律不投递
+    try:
+        home = Path.home().resolve()
+    except (OSError, RuntimeError):
+        home = None
+    if home is not None and resolved.parent == home and name.startswith("."):
+        return True
+    return False
 
 
 def file_meta(path: Path) -> Dict[str, Any]:
@@ -133,15 +222,17 @@ def collect_files(
     max_files: int = 5,
     max_bytes: int = 25 * 1024 * 1024,
     allowed_roots: Sequence[str] = (),
+    fallback_roots: Sequence[str] = (),
 ) -> List[Dict[str, Any]]:
-    """从一批 DSH records 里挑出可投递的文件（去重、保序、限量）。"""
+    """从一批 DSH records 里挑出可投递的文件（去重、保序、限量）。
 
-    roots: List[Path] = []
-    for item in allowed_roots:
-        try:
-            roots.append(Path(item).expanduser().resolve())
-        except (OSError, ValueError):
-            continue
+    ``allowed_roots`` 为空时使用 ``fallback_roots``（插件数据目录）；
+    两者都为空则不投递任何文件。
+    """
+
+    roots = _resolve_roots(allowed_roots) or _resolve_roots(fallback_roots)
+    if not roots:
+        return []
 
     found: List[Dict[str, Any]] = []
     seen: set[str] = set()
@@ -163,7 +254,7 @@ def collect_files(
                 key = str(path).casefold()
                 if key in seen or is_denied(path):
                     continue
-                if roots and not any(_is_within(path, root) for root in roots):
+                if not any(_is_within(path, root) for root in roots):
                     continue
                 try:
                     size = path.stat().st_size
@@ -200,18 +291,6 @@ def to_file_payload(meta: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def read_base64(meta: Dict[str, Any], *, limit: int = 8 * 1024 * 1024) -> Optional[str]:
-    """读成 base64；超过 limit 返回 None。"""
-
-    path = Path(str(meta.get("path", "")))
-    try:
-        if path.stat().st_size > limit:
-            return None
-        return base64.b64encode(path.read_bytes()).decode("ascii")
-    except OSError:
-        return None
-
-
 def human_size(size: int) -> str:
     """人类可读的大小。"""
 
@@ -223,39 +302,34 @@ def human_size(size: int) -> str:
     return f"{value:.1f} GB"
 
 
-def summarize(files: Sequence[Dict[str, Any]], limit: int = 5) -> str:
-    """一行式摘要，用于 QQ 文本提示。"""
-
-    items = list(files)[:limit]
-    if not items:
-        return ""
-    return "、".join(f"{item['name']}（{human_size(int(item.get('size') or 0))}）" for item in items)
-
-
-def describe_for_prompt(files: Sequence[Dict[str, Any]]) -> str:
-    """给前端展示用的紧凑结构。"""
-
-    return "\n".join(f"{item['name']}\t{human_size(int(item.get('size') or 0))}\t{item['path']}" for item in files)
-
-
-def _resolve_roots(allowed_roots: Sequence[str]) -> List[Path]:
+def _resolve_roots(*groups: Sequence[str]) -> List[Path]:
     roots: List[Path] = []
-    for item in allowed_roots or []:
-        try:
-            roots.append(Path(str(item)).expanduser().resolve())
-        except (OSError, ValueError):
-            continue
+    for group in groups:
+        for item in group or []:
+            try:
+                roots.append(Path(str(item)).expanduser().resolve())
+            except (OSError, ValueError, RuntimeError):
+                continue
     return roots
 
 
-def is_allowed_root(path: Path, allowed_roots: Sequence[str]) -> bool:
-    """文件是否落在 ``files.allowed_roots`` 允许的目录内；留空表示不限制。"""
+def is_allowed_root(
+    path: Path,
+    allowed_roots: Sequence[str],
+    *,
+    fallback_roots: Sequence[str] = (),
+) -> bool:
+    """文件是否落在 ``files.allowed_roots`` 允许的目录内。
 
-    roots = _resolve_roots(allowed_roots)
+    留空时退回到 ``fallback_roots``（插件数据目录）；两者都为空则默认拒绝，
+    宁可少投递，也不把任意本机文件发出去。
+    """
+
+    roots = _resolve_roots(allowed_roots) or _resolve_roots(fallback_roots)
     if not roots:
-        return True
+        return False
     try:
         resolved = Path(path).resolve()
-    except OSError:
+    except (OSError, RuntimeError):
         return False
     return any(_is_within(resolved, root) for root in roots)

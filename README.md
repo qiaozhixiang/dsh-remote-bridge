@@ -43,7 +43,7 @@
    ```toml
    [plugin]
    enabled = true
-   config_version = "1.6.3"
+   config_version = "1.6.4"
 
    [connection]
    base_url = "http://127.0.0.1:3080"   # DSH Web 地址
@@ -74,7 +74,7 @@ MaiBot 自带的 venv 里两者都有，无需额外安装。
 | 键 | 默认 | 说明 |
 |---|---|---|
 | `connection.base_url` | `http://127.0.0.1:3080` | DSH Web 地址，可填 `host:port`（自动补 `http://`） |
-| `connection.token` | 空 | DSH 若开了访问令牌校验就填这里 |
+| `connection.token` | 空 | DSH 若开了访问令牌校验就填这里；只在目标地址与 `base_url` 同源时携带（非同源的探活/切换不带令牌） |
 | `connection.timeout_seconds` | `12.0` | 单次 HTTP 超时 |
 | `connection.verify_tls` | `true` | HTTPS 是否校验证书 |
 | `connection.http_proxy` | 空 | 访问公网地址时用的 HTTP 代理（如 `http://127.0.0.1:1080`）；回环地址自动跳过 |
@@ -86,7 +86,7 @@ MaiBot 自带的 venv 里两者都有，无需额外安装。
 | `files.auto_send` | `true` | `/dsh ask` 收到回复后自动把新生成的文件发到当前对话 |
 | `files.max_files` | `5` | 单次最多投递几个文件 |
 | `files.max_size_mb` | `25` | 单个文件大小上限（MB） |
-| `files.allowed_roots` | `[]` | 只允许投递这些目录下的文件（自动投递与 `send_file` API 都校验）；空表示不限制（敏感目录始终拒绝） |
+| `files.allowed_roots` | `[]` | 只允许投递这些目录下的文件（自动投递与 `send_file` API 都校验）；空表示只允许插件数据目录（凭据/系统目录始终拒绝） |
 | `tunnel.enabled` | `false` | 公网隧道总开关；默认关闭，需要临时调试时再打开 |
 
 ## 协议说明（给二次开发者）
@@ -226,7 +226,7 @@ dsh-remote-bridge/
 | `/dsh plugin on all` | 一键开启全部 DSH 插件（同上） | 白名单 |
 | `/dsh lan` | **启动内网通道**：自动切到 `access.json` 里的局域网地址并验证，只回「已启动」 | 白名单 |
 | `/dsh lan off` | 关闭内网通道，切回直连 | 白名单 |
-| `/dsh status` | 桥接状态、当前会话、预设、隧道状态 | 白名单 |
+| `/dsh status` | 桥接状态、当前会话、预设、隧道运行状态（地址用 `/dsh tunnel` 查） | 白名单 |
 | `/dsh tunnel` | 查看公网隧道状态与地址 | 白名单 |
 | `/dsh tunnel on\|off` | 启动 / 停止公网隧道（开启只回「已启动」，地址用 `/dsh tunnel` 查） | 白名单 |
 | `/dsh whoami` | 查看自己的 QQ 与权限 | 白名单 |
@@ -282,7 +282,7 @@ max_reply_chars = 1200        # 单条推送的最大字符数
 - 内网直接用端口连，不需要开隧道；
 - 外网必须用公网地址，且隧道必须处于 `running`；
 - WebUI 面板有「切到内网」「切到公网」两个按钮，等价于把插件的连接目标切到 `direct` / `public`；
-- QQ 侧可以用 `/dsh tunnel on` 启动隧道，再用 `/dsh status` 看当前连接地址；
+- QQ 侧可以用 `/dsh tunnel on` 启动隧道，再用 `/dsh tunnel` 查看当前公网地址；
 - `/dsh lan` 直接切到内网通道（只回「已启动」），`/dsh lan off` 切回直连。
 
 > 插件默认不带任何白名单号码与个人路径，安装后请自行填写 `[whitelist] qq_numbers`、`admins`，以及按需填写 `[tunnel] lan_url`。公网隧道默认关闭（`[tunnel] enabled = false`），需要时再打开。

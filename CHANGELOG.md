@@ -1,3 +1,16 @@
+## 1.6.4
+
+### 安全
+
+- **文件投递的默认范围收窄**：`files.allowed_roots` 留空时不再等于「全盘放行」，而是只允许插件数据目录（`ctx.paths.data_dir`）。自动投递（`collect_files`）与 `send_file` API 都走同一套判定。
+- **凭据与系统目录拒绝表补齐**：在原有 `.ssh`/`.aws`/`.git` 等目录之外，新增 `.kube`、`.docker`、`.gcloud`、`.mozilla`、`.thunderbird`、`.password-store` 等目录；`/etc`、`/proc`、`/sys`、`/root`、`C:\Windows`、`Program Files` 等系统路径；以及 `id_rsa`/`*.pem`/`*.key`/`*token*`/`*secret*`/`.netrc`/`credentials.json`/`logins.json`/`cookies.sqlite` 等文件名模式。缓解「DSH 抓取的网页里塞本机路径，内容被 `files.auto_send` 直接发进群」的风险。
+- **访问令牌不再跨源发送**：`test_connection` 与 `switch_endpoint` 切换到与 `connection.base_url` 不同源的地址时，不再携带 `Authorization: Bearer` / `X-DSH-Token`，并记录一条 warning；探活返回体新增 `auth_sent` 字段说明本次是否带令牌。
+- **`/dsh status` 不再明文回显公网隧道地址**，与 `/dsh tunnel on` 只回「已启动」的约定统一；需要地址时用 `/dsh tunnel` 主动查询。
+
+### 清理
+
+- 删除 `files.py` 里未使用的 `read_base64`、`summarize`、`describe_for_prompt`。
+
 ## 1.6.3
 
 ### 修复

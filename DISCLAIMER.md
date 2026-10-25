@@ -15,9 +15,10 @@
 | 内网通道 | 可选，把连接切到 DSH 的局域网监听地址 |
 | DSH 插件开关 | 可选，批量开启 DSH 侧插件 |
 
-**文件投递会读取本机文件**。默认禁止 `.ssh`、`.gnupg`、`.aws`、`.git`、`cookies` 等敏感目录，
-但这不等于绝对安全：请把 `files.allowed_roots` 配置成你愿意暴露的目录（例如某个工作区），
-不要留空交给默认值长期运行。
+**文件投递会读取本机文件**。默认拒绝 `.ssh`、`.gnupg`、`.aws`、`.kube`、`.docker`、`.mozilla`、`.git` 等目录，
+`/etc`、`/proc`、`/sys`、`/root`、`C:\Windows` 等系统路径，以及 `id_rsa`、`*.pem`、`*token*`、`*secret*`、
+`.netrc`、`credentials.json`、`logins.json` 等凭据文件名；`files.allowed_roots` 留空时只允许投递插件数据目录。
+即便如此也不等于绝对安全：请把它配置成你愿意暴露的目录（例如某个工作区），不要随手放进敏感目录。
 
 **公网隧道会把 DSH 暴露到互联网**。quick tunnel 地址是随机域名、无身份认证，
 任何人拿到地址都能访问你的 DSH。隧道默认关闭（`tunnel.enabled = false`），
