@@ -1,6 +1,7 @@
 __pycache__/
 *.py[cod]
 *.log
+/config.toml
 config_back/
 .testdata/
 dist/

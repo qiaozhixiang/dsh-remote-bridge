@@ -1,9 +1,23 @@
+## 1.6.3
+
+### 修复
+
+- `send_file` API（以及 WebUI 的 `sendFile` 动作）现在也会校验 `files.allowed_roots`：之前只有自动投递走这层校验，与「只允许投递这些目录下的文件」的配置说明不一致。
+- 移除 `files.py` 里定义了却从未调用的 `looks_like_output_dir`，路径校验统一为 `_DENY_PARTS` + `files.allowed_roots`。
+- `host_application.max_version` 由 `999.999.999` 改为 `1.3.99`，与 README 声明和实际验证过的宿主版本一致。
+- 仓库不再跟踪 `config.toml`：运行时配置由 MaiBot 按配置模型自动生成，`.gitignore` 增加 `/config.toml`，避免用户改过的配置在升级时被覆盖。
+
+### 变更
+
+- 公网隧道默认关闭（`tunnel.enabled` 默认 `false`），与 DISCLAIMER「仅在临时调试时开启」的说法对齐。
+- `plugin_type` 由 `extension` 改为 `integration`，更贴合「桥接外部 DSH 服务 + QQ 命令 + 自定义页面」的实际形态。
+
 ## 1.6.2
 
 ### 修复
 
-- `config_version` 默认值与 `config.toml` 对齐到插件版本（原先模型默认 `1.0.0`、配置文件 `1.6.0`，两边不同会让 MaiBot 每次启动都判定「配置版本升级」并重写 `config.toml`，把用户手写的注释冲掉）。
-- `host_application.max_version` 从 `1.3.99` 放宽到 `999.999.999`：按 MaiBot 官方建议只认真约束 `min_version`，避免 Host 升级一个小版本插件就被判为不兼容而拒绝加载。
+- `config_version` 默认值与配置文件对齐到插件版本（原先模型默认 `1.0.0`、配置文件 `1.6.0`，两边不同会让 MaiBot 每次启动都判定「配置版本升级」并重写 `config.toml`，把用户手写的注释冲掉）。
+- `host_application.max_version` 从 `1.3.99` 放宽到 `999.999.999`。（1.6.3 起改回 `1.3.99`：插件商店要求上界对应实际验证过的宿主版本。）
 
 ### 文档
 

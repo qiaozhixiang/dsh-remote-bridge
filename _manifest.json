@@ -2,7 +2,7 @@
   "manifest_version": 2,
   "id": "github.qiaozhixiang.dsh-remote-bridge",
   "name": "DSH 远程桥接",
-  "version": "1.6.2",
+  "version": "1.6.3",
   "description": "把本机 DSH（DeepSeek Shell）的会话、模型与实时输出接到 MaiBot：QQ 命令远程对话、公网隧道、内网通道、插件批量开关与 WebUI 控制台",
   "author": {
     "name": "qiaozhixiang",
@@ -16,10 +16,10 @@
     "issues": "https://github.com/qiaozhixiang/dsh-remote-bridge/issues"
   },
   "changelog": "CHANGELOG.md",
-  "plugin_type": "extension",
+  "plugin_type": "integration",
   "host_application": {
     "min_version": "1.3.0",
-    "max_version": "999.999.999"
+    "max_version": "1.3.99"
   },
   "sdk": {
     "min_version": "2.0.0",

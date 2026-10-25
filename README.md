@@ -38,12 +38,12 @@
    <MaiBot>/plugins/dsh-remote-bridge/
    ```
 
-2. 修改 `config.toml`：
+2. 首次加载后按需调整配置。`config.toml` 由 MaiBot 依据插件内的配置模型自动生成到插件数据目录，**仓库里不附带这个文件**；推荐直接在 WebUI 的插件配置页改，生成后的默认内容如下：
 
    ```toml
    [plugin]
    enabled = true
-   config_version = "1.6.2"
+   config_version = "1.6.3"
 
    [connection]
    base_url = "http://127.0.0.1:3080"   # DSH Web 地址
@@ -86,7 +86,8 @@ MaiBot 自带的 venv 里两者都有，无需额外安装。
 | `files.auto_send` | `true` | `/dsh ask` 收到回复后自动把新生成的文件发到当前对话 |
 | `files.max_files` | `5` | 单次最多投递几个文件 |
 | `files.max_size_mb` | `25` | 单个文件大小上限（MB） |
-| `files.allowed_roots` | `[]` | 只允许投递这些目录下的文件；空表示不限制（敏感目录始终拒绝） |
+| `files.allowed_roots` | `[]` | 只允许投递这些目录下的文件（自动投递与 `send_file` API 都校验）；空表示不限制（敏感目录始终拒绝） |
+| `tunnel.enabled` | `false` | 公网隧道总开关；默认关闭，需要临时调试时再打开 |
 
 ## 协议说明（给二次开发者）
 
@@ -124,7 +125,6 @@ Content-Type: application/json
 ```
 dsh-remote-bridge/
 ├── _manifest.json       插件清单（MaiBot manifest v2）
-├── config.toml          插件配置
 ├── plugin.py            插件主体（配置模型 + @API + 生命周期）
 ├── qq_commands.py       QQ 命令层（/dsh 系列命令、白名单、回复推送、文件投递）
 ├── tunnel.py            公网隧道（cloudflared）+ 本地反代
@@ -142,7 +142,7 @@ dsh-remote-bridge/
 ## 可移植性说明
 
 * 只依赖 `maibot_sdk`，**不 import 任何 `src.*`**（MaiBot 插件硬性要求）
-* 不写死任何路径，所有外部状态都在 `config.toml`
+* 不写死任何路径，所有外部状态都来自插件配置项
 * `webui/index.html` 是单文件，无 CDN、无外部字体、无构建步骤
 * 页面所有网络请求都经 `window.maibot.query/action` 走宿主桥（iframe CSP 是 `connect-src 'none'`，不能自己 fetch）
 * 适配 `host_application 1.3.0 ~ 1.3.99`、`sdk 2.0.0 ~ 2.99.99`
@@ -234,7 +234,7 @@ dsh-remote-bridge/
 | `/dsh deny <QQ>` | 把某人移出白名单 | 管理员 |
 | `/dsh allowlist` | 查看白名单 | 管理员 |
 
-白名单位于 `config.toml`：
+白名单位于插件配置的 `[whitelist]` 段（WebUI 插件配置页里是「QQ 白名单」）：
 
 ```toml
 [whitelist]
@@ -263,7 +263,7 @@ max_reply_chars = 1200        # 单条推送的最大字符数
 
 ## 公网隧道
 
-`[tunnel]` 段控制：`enabled`（总开关）、`auto_start`（随插件启动）、`cloudflared_path`（留空则自动探测 `~/.dsh/remote/bin/cloudflared.exe` 或 PATH）、`target_url`（留空则用 `[connection] base_url`）、`proxy_port`（本机反向代理端口，默认 3081）、`lan_url` / `lan_port`（内网通道地址与端口，留 0 自动读 `access.json`）。
+`[tunnel]` 段控制：`enabled`（总开关，**默认关闭**）、`auto_start`（随插件启动）、`cloudflared_path`（留空则自动探测 `~/.dsh/remote/bin/cloudflared.exe` 或 PATH）、`target_url`（留空则用 `[connection] base_url`）、`proxy_port`（本机反向代理端口，默认 3081）、`lan_url` / `lan_port`（内网通道地址与端口，留 0 自动读 `access.json`）。
 
 隧道启动后 `public_url` 即为公网入口；WebUI 顶部「公网隧道」按钮可视化管理，`/dsh tunnel on|off` 也能在 QQ 里开关。快速隧道（trycloudflare）无需账号，但地址每次重启都会变，且没有可用性保证。
 
@@ -285,4 +285,4 @@ max_reply_chars = 1200        # 单条推送的最大字符数
 - QQ 侧可以用 `/dsh tunnel on` 启动隧道，再用 `/dsh status` 看当前连接地址；
 - `/dsh lan` 直接切到内网通道（只回「已启动」），`/dsh lan off` 切回直连。
 
-> 打包分发的 `config.toml` 不包含任何白名单号码与个人路径，安装后请自行填写 `[whitelist] qq_numbers`、`admins`，以及按需填写 `[tunnel] lan_url`。
+> 插件默认不带任何白名单号码与个人路径，安装后请自行填写 `[whitelist] qq_numbers`、`admins`，以及按需填写 `[tunnel] lan_url`。公网隧道默认关闭（`[tunnel] enabled = false`），需要时再打开。

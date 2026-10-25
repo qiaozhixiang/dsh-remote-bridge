@@ -146,7 +146,7 @@ class PluginSectionConfig(PluginConfigBase):
     __ui_order__ = 0
 
     enabled: bool = Field(default=True, description="是否启用插件")
-    config_version: str = Field(default="1.6.2", description="配置版本")
+    config_version: str = Field(default="1.6.3", description="配置版本")
 
 
 class ConnectionConfig(PluginConfigBase):
@@ -207,7 +207,7 @@ class TunnelConfig(PluginConfigBase):
     __ui_icon__ = "globe"
     __ui_order__ = 4
 
-    enabled: bool = Field(default=True, description="是否允许启动公网隧道")
+    enabled: bool = Field(default=False, description="是否允许启动公网隧道（默认关闭，仅在需要临时调试时手动打开）")
     auto_start: bool = Field(default=False, description="插件加载时自动启动隧道")
     cloudflared_path: str = Field(default="", description="cloudflared 可执行文件路径；留空自动探测")
     target_url: str = Field(default="", description="隧道转发的目标地址；留空使用 connection.base_url")
@@ -1075,6 +1075,15 @@ class DshRemoteBridgePlugin(QqCommandMixin, MaiBotPlugin):
             return {"ok": False, "error": {"code": "files/not-found", "message": "文件不存在或不是普通文件", "details": {"path": path}}}
         if _files_module.is_denied(target):
             return {"ok": False, "error": {"code": "files/denied", "message": "该目录不允许投递", "details": {"path": str(target)}}}
+        if not _files_module.is_allowed_root(target, cfg.allowed_roots or []):
+            return {
+                "ok": False,
+                "error": {
+                    "code": "files/outside-roots",
+                    "message": "该文件不在 files.allowed_roots 允许的目录里",
+                    "details": {"path": str(target), "allowed_roots": list(cfg.allowed_roots or [])},
+                },
+            }
         meta = file_meta(target)
         limit = max(1, int(cfg.max_size_mb or 25)) * 1024 * 1024
         if int(meta.get("size") or 0) > limit:

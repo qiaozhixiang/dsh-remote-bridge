@@ -238,8 +238,24 @@ def describe_for_prompt(files: Sequence[Dict[str, Any]]) -> str:
     return "\n".join(f"{item['name']}\t{human_size(int(item.get('size') or 0))}\t{item['path']}" for item in files)
 
 
-def looks_like_output_dir(path: str) -> bool:
-    """排除系统目录（简单启发式）。"""
+def _resolve_roots(allowed_roots: Sequence[str]) -> List[Path]:
+    roots: List[Path] = []
+    for item in allowed_roots or []:
+        try:
+            roots.append(Path(str(item)).expanduser().resolve())
+        except (OSError, ValueError):
+            continue
+    return roots
 
-    text = (path or "").casefold()
-    return any(token in text for token in ("\\windows\\", "/usr/", "/etc/", "/bin/", "appdata\\local\\temp"))
+
+def is_allowed_root(path: Path, allowed_roots: Sequence[str]) -> bool:
+    """文件是否落在 ``files.allowed_roots`` 允许的目录内；留空表示不限制。"""
+
+    roots = _resolve_roots(allowed_roots)
+    if not roots:
+        return True
+    try:
+        resolved = Path(path).resolve()
+    except OSError:
+        return False
+    return any(_is_within(resolved, root) for root in roots)
