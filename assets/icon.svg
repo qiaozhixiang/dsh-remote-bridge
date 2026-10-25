@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="DSH 远程桥接">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#38BDF8"/>
+      <stop offset="100%" stop-color="#6366F1"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="#0F172A"/>
+  <rect x="8" y="14" width="48" height="30" rx="6" fill="none" stroke="url(#g)" stroke-width="3"/>
+  <circle cx="16" cy="22" r="2.2" fill="#38BDF8"/>
+  <circle cx="24" cy="22" r="2.2" fill="#38BDF8"/>
+  <circle cx="32" cy="22" r="2.2" fill="#6366F1"/>
+  <path d="M20 32h24M20 38h16" stroke="url(#g)" stroke-width="2.6" stroke-linecap="round"/>
+  <path d="M32 44v6M24 50h16" stroke="url(#g)" stroke-width="3" stroke-linecap="round"/>
+</svg>

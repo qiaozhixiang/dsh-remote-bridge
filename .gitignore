@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+*.log
+config_back/
+.testdata/
+dist/
+.venv/
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# 本机发布笔记，不进仓库
+PUBLISH.md
+NEXT-STEPS.md

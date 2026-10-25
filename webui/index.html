@@ -1,0 +1,1084 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>DSH 控制台</title>
+<style>
+  :root {
+    --bg: var(--maibot-background, #0b1120);
+    --surface: var(--maibot-surface, #111a2e);
+    --fg: var(--maibot-foreground, #e2e8f0);
+    --muted: var(--maibot-muted, #94a3b8);
+    --soft: var(--maibot-soft, rgba(148, 163, 184, 0.12));
+    --border: var(--maibot-border, rgba(148, 163, 184, 0.22));
+    --primary: var(--maibot-primary, #38bdf8);
+    --primary-fg: var(--maibot-primary-foreground, #04121f);
+    --danger: var(--maibot-danger, #f87171);
+    --radius: var(--maibot-radius, 10px);
+    --font: var(--maibot-font-body, system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif);
+    --mono: var(--maibot-font-mono, ui-monospace, "Cascadia Code", Consolas, monospace);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font);
+    font-size: 13px;
+    line-height: 1.55;
+    overflow: hidden;
+  }
+  .app { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+
+  header.bar {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; border-bottom: 1px solid var(--border);
+    background: var(--surface); flex: 0 0 auto;
+  }
+  .brand { font-weight: 600; letter-spacing: .2px; display: flex; align-items: center; gap: 8px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: 0 0 auto; }
+  .dot.ok { background: #34d399; box-shadow: 0 0 0 3px rgba(52, 211, 153, .18); }
+  .dot.bad { background: var(--danger); box-shadow: 0 0 0 3px rgba(248, 113, 113, .18); }
+  .dot.busy { background: #fbbf24; }
+  .grow { flex: 1 1 auto; }
+  .endpoint { color: var(--muted); font-family: var(--mono); font-size: 11.5px; }
+
+  button {
+    font: inherit; color: var(--fg); background: var(--soft);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 5px 11px; cursor: pointer; transition: .15s ease; white-space: nowrap;
+  }
+  button:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.primary { background: var(--primary); color: var(--primary-fg); border-color: transparent; font-weight: 600; }
+  button.primary:hover:not(:disabled) { filter: brightness(1.08); color: var(--primary-fg); }
+  button.danger { color: var(--danger); }
+  button.danger:hover:not(:disabled) { border-color: var(--danger); }
+
+  input, textarea, select {
+    font: inherit; color: var(--fg); background: var(--bg);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 6px 9px; outline: none; width: 100%;
+  }
+  input:focus, textarea:focus, select:focus { border-color: var(--primary); }
+  textarea { resize: none; }
+
+  .body { display: flex; flex: 1 1 auto; min-height: 0; }
+
+  aside {
+    width: 292px; flex: 0 0 292px; display: flex; flex-direction: column;
+    border-right: 1px solid var(--border); background: var(--surface); min-height: 0;
+  }
+  .aside-head { padding: 10px; display: flex; flex-direction: column; gap: 8px; border-bottom: 1px solid var(--border); }
+  .row { display: flex; gap: 6px; align-items: center; }
+  .session-list { overflow-y: auto; flex: 1 1 auto; padding: 6px; }
+  .session {
+    padding: 8px 10px; border-radius: var(--radius); cursor: pointer;
+    border: 1px solid transparent; margin-bottom: 4px;
+  }
+  .session:hover { background: var(--soft); }
+  .session.active { background: var(--soft); border-color: var(--primary); }
+  .session .t { display: flex; align-items: center; gap: 6px; font-weight: 500; }
+  .session .t span.name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .session .m { color: var(--muted); font-size: 11px; font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  main { flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .main-head {
+    display: flex; align-items: center; gap: 8px; padding: 9px 14px;
+    border-bottom: 1px solid var(--border); flex: 0 0 auto; flex-wrap: wrap;
+  }
+  .main-head .title { font-weight: 600; max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; color: var(--muted); font-size: 11px; font-family: var(--mono); }
+  .chip { border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px; }
+
+  .transcript { flex: 1 1 auto; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+  .msg { display: flex; flex-direction: column; gap: 4px; max-width: 100%; }
+  .msg .who { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+  .bubble {
+    border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 8px 12px; white-space: pre-wrap; word-break: break-word; background: var(--surface);
+  }
+  .msg.user .bubble { background: rgba(56, 189, 248, .1); border-color: rgba(56, 189, 248, .35); }
+  .msg.assistant .bubble { background: var(--surface); }
+  .msg.tool .bubble { font-family: var(--mono); font-size: 11.5px; color: var(--muted); background: transparent; border-style: dashed; }
+  .msg.meta { align-items: center; }
+  .msg.meta .bubble { background: transparent; border: none; color: var(--muted); font-size: 11px; padding: 2px; }
+  .reasoning { color: var(--muted); font-size: 11.5px; border-left: 2px solid var(--border); padding-left: 8px; white-space: pre-wrap; }
+  .tools { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+  .tool-call { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+  .tool-call b { color: var(--primary); font-weight: 600; }
+
+  .files { display: none; gap: 8px; align-items: center; flex-wrap: wrap; padding: 8px 14px 0; }
+  .files-label { font-size: 12px; color: #64748b; }
+  .file-chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #cbd5e1;
+    background: #f8fafc; color: #0f172a; border-radius: 999px; padding: 4px 10px; cursor: pointer;
+    font-size: 12px; max-width: 260px; }
+  .file-chip:hover { border-color: #0ea5e9; color: #0369a1; }
+  .file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .file-size { color: #94a3b8; }
+  .composer { flex: 0 0 auto; border-top: 1px solid var(--border); padding: 10px 14px 12px; display: flex; flex-direction: column; gap: 8px; }
+  .composer .meta { display: flex; gap: 8px; align-items: center; color: var(--muted); font-size: 11px; }
+  .composer textarea { min-height: 62px; max-height: 220px; }
+
+  .empty { margin: auto; text-align: center; color: var(--muted); max-width: 420px; }
+  .empty h2 { color: var(--fg); font-size: 15px; margin: 0 0 6px; }
+  .empty code { font-family: var(--mono); background: var(--soft); padding: 1px 5px; border-radius: 5px; }
+
+  .banner { padding: 8px 14px; font-size: 12px; border-bottom: 1px solid var(--border); display: none; }
+  .banner.show { display: block; }
+  .banner.err { background: rgba(248, 113, 113, .12); color: #fecaca; }
+  .banner.info { background: rgba(56, 189, 248, .1); color: #bae6fd; }
+
+  dialog {
+    border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface);
+    color: var(--fg); padding: 0; width: min(460px, 92vw);
+  }
+  dialog::backdrop { background: rgba(2, 6, 23, .65); }
+  .dlg-body { padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .dlg-body label { font-size: 11.5px; color: var(--muted); display: block; margin-bottom: 3px; }
+  .dlg-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 0 16px 16px; }
+  h3 { margin: 0; font-size: 14px; }
+
+  .spin { width: 12px; height: 12px; border: 2px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: sp .7s linear infinite; }
+  @keyframes sp { to { transform: rotate(360deg); } }
+  ::-webkit-scrollbar { width: 9px; height: 9px; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="bar">
+    <div class="brand"><span class="dot" id="conn-dot"></span>DSH 远程桥接</div>
+    <span class="endpoint" id="endpoint">连接中…</span>
+    <div class="grow"></div>
+    <span class="endpoint" id="stream-state"></span>
+    <button id="btn-tunnel" title="公网隧道与 QQ 白名单">公网隧道</button>
+    <button id="btn-test" title="重新测试连接">测试连接</button>
+    <button id="btn-refresh" title="刷新会话列表">刷新</button>
+  </header>
+
+  <div class="banner" id="banner"></div>
+
+  <div class="body">
+    <aside>
+      <div class="aside-head">
+        <input id="search" placeholder="搜索会话标题 / 路径 / ID" />
+        <div class="row">
+          <button class="primary" id="btn-new" style="flex:1">新建会话</button>
+          <button id="btn-rename" disabled>重命名</button>
+        </div>
+      </div>
+      <div class="session-list" id="sessions"></div>
+    </aside>
+
+    <main>
+      <div class="main-head">
+        <span class="title" id="title">未选择会话</span>
+        <div class="chips" id="chips"></div>
+        <div class="grow"></div>
+        <button id="btn-earlier" style="display:none" title="加载更早的历史消息">加载更早</button>
+        <select id="model-select" style="width:auto;max-width:260px" title="切换模型" disabled>
+          <option value="">模型…</option>
+        </select>
+        <select id="effort-select" style="width:auto;display:none" title="推理强度"></select>
+        <button class="danger" id="btn-cancel" disabled>中断</button>
+        <button class="danger" id="btn-stop" disabled>停止会话</button>
+      </div>
+
+      <div class="transcript" id="transcript">
+        <div class="empty">
+          <h2>选择一个 DSH 会话</h2>
+          <p>在左侧挑选会话即可查看历史并实时跟随生成过程；也可以点右上角「新建会话」。</p>
+          <p>连接地址可在插件配置 <code>config.toml</code> 的 <code>[connection] base_url</code> 修改。</p>
+        </div>
+      </div>
+
+      <div class="files" id="files"></div>
+
+      <div class="composer">
+        <textarea id="input" placeholder="给 DSH 发消息…（Enter 发送，Shift+Enter 换行）" disabled></textarea>
+        <div class="meta">
+          <span id="hint">未选择会话</span>
+          <div class="grow"></div>
+          <span id="queued"></span>
+          <button class="primary" id="btn-send" disabled>发送</button>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<dialog id="dlg-new">
+  <div class="dlg-body">
+    <h3>新建 DSH 会话</h3>
+    <div>
+      <label for="new-cwd">工作目录（可留空，使用 DSH 默认）</label>
+      <input id="new-cwd" placeholder="例如 E:\\workspace" />
+    </div>
+    <div>
+      <label for="new-preset">Agent 预设</label>
+      <select id="new-preset"><option value="">默认</option></select>
+    </div>
+  </div>
+  <div class="dlg-foot">
+    <button id="new-cancel">取消</button>
+    <button class="primary" id="new-ok">创建</button>
+  </div>
+</dialog>
+
+<dialog id="dlg-rename">
+  <div class="dlg-body">
+    <h3>重命名会话</h3>
+    <div>
+      <label for="rename-title">新标题</label>
+      <input id="rename-title" />
+    </div>
+  </div>
+  <div class="dlg-foot">
+    <button id="rename-cancel">取消</button>
+    <button class="primary" id="rename-ok">保存</button>
+  </div>
+</dialog>
+
+<dialog id="dlg-tunnel">
+  <div class="dlg-body">
+    <h3>公网隧道与 QQ 白名单</h3>
+    <p style="margin:0;color:var(--muted);font-size:12px">
+      通过 cloudflared 把本机 DSH 暴露到公网；QQ 侧仅白名单内的号码可以驱动 DSH。
+    </p>
+    <div class="row">
+      <span class="chip" id="tunnel-badge">未启动</span>
+      <span class="chip" id="tunnel-mode">连接：内网直连</span>
+      <span style="color:var(--muted);font-size:11.5px" id="tunnel-note"></span>
+    </div>
+    <div>
+      <label for="tunnel-url">公网地址（外网用这个）</label>
+      <input id="tunnel-url" readonly placeholder="启动后自动生成" />
+    </div>
+    <div>
+      <label for="tunnel-direct">内网直连（本机端口）</label>
+      <input id="tunnel-direct" readonly />
+    </div>
+    <div>
+      <label for="tunnel-lan">内网共享（同网段设备）</label>
+      <input id="tunnel-lan" readonly />
+    </div>
+    <div>
+      <label for="tunnel-local">本地代理</label>
+      <input id="tunnel-local" readonly />
+    </div>
+    <div>
+      <label>白名单 QQ</label>
+      <div class="chips" id="tunnel-whitelist"></div>
+    </div>
+  </div>
+  <div class="dlg-foot">
+    <button id="tunnel-copy">复制地址</button>
+    <button id="tunnel-start-lan">启动内网通道</button>
+    <button id="tunnel-use-direct">切到内网</button>
+    <button id="tunnel-use-public">切到公网</button>
+    <button id="tunnel-close">关闭</button>
+    <button id="tunnel-stop">停止</button>
+    <button class="primary" id="tunnel-start">启动隧道</button>
+  </div>
+</dialog>
+
+<script>
+(function () {
+  "use strict";
+  var api = window.maibot;
+  var $ = function (id) { return document.getElementById(id); };
+
+  var S = {
+    status: null,
+    sessions: [],
+    current: null,
+    messages: [],
+    cursor: 0,
+    streaming: false,
+    streamSupported: true,
+    allowWrite: true,
+    models: null,
+    presets: [],
+    selectedModel: "",
+    selectedEffort: "",
+    detail: null,
+    hasMore: false,
+    earliest: 0,
+    files: [],
+    pollTimer: null,
+    gen: 0,
+    busyCount: 0
+  };
+
+  // ---- 串行调用队列：宿主允许 2 并发，这里统一串行，避免 429 ----
+  var chain = Promise.resolve();
+  function run(kind, name, args) {
+    var fn = kind === "queries" ? null : null;
+    var task = function () {
+      if (kind === "queries") return api.query(name, args || {});
+      return api.action(name, args || {});
+    };
+    var p = chain.then(task, task);
+    chain = p.then(function () {}, function () {});
+    return p;
+  }
+  function q(name, args) { return run("queries", name, args); }
+  function a(name, args) { return run("actions", name, args); }
+
+  function esc(text) {
+    return String(text == null ? "" : text)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
+  function banner(kind, text) {
+    var el = $("banner");
+    if (!text) { el.className = "banner"; el.textContent = ""; return; }
+    el.className = "banner show " + kind;
+    el.textContent = text;
+  }
+
+  function setDot(state) {
+    var el = $("conn-dot");
+    el.className = "dot" + (state === "ok" ? " ok" : state === "bad" ? " bad" : state === "busy" ? " busy" : "");
+  }
+
+  function ago(ms) {
+    if (!ms) return "";
+    var diff = Date.now() - ms;
+    if (diff < 0) diff = 0;
+    var s = Math.floor(diff / 1000);
+    if (s < 60) return s + " 秒前";
+    var m = Math.floor(s / 60);
+    if (m < 60) return m + " 分钟前";
+    var h = Math.floor(m / 60);
+    if (h < 24) return h + " 小时前";
+    return Math.floor(h / 24) + " 天前";
+  }
+
+  function fmtNum(n) {
+    if (n == null) return "–";
+    if (n >= 1e6) return (n / 1e6).toFixed(1) + "M";
+    if (n >= 1e3) return (n / 1e3).toFixed(1) + "k";
+    return String(n);
+  }
+
+  // --------------------------------------------------------------- 渲染
+
+  function renderSessions() {
+    var host = $("sessions");
+    if (!S.sessions.length) {
+      host.innerHTML = '<div class="empty" style="padding:24px 10px;font-size:12px">没有匹配的会话</div>';
+      return;
+    }
+    var html = "";
+    for (var i = 0; i < S.sessions.length; i++) {
+      var s = S.sessions[i];
+      var cls = "session" + (s.session_id === S.current ? " active" : "");
+      html += '<div class="' + cls + '" data-id="' + esc(s.session_id) + '" data-title="' + esc(s.title) + '">' +
+        '<div class="t"><span class="dot' + (s.running ? " busy" : "") + '" style="width:6px;height:6px"></span>' +
+        '<span class="name">' + esc(s.title || s.session_id) + '</span></div>' +
+        '<div class="m">' + esc(ago(s.updated_at)) + (s.cwd ? " · " + esc(s.cwd) : "") + '</div>' +
+        '</div>';
+    }
+    host.innerHTML = html;
+    var nodes = host.querySelectorAll(".session");
+    for (var k = 0; k < nodes.length; k++) {
+      nodes[k].addEventListener("click", function () {
+        selectSession(this.getAttribute("data-id"), this.getAttribute("data-title"));
+      });
+    }
+  }
+
+  function renderChips() {
+    var d = S.detail && S.detail.values ? S.detail.values : {};
+    var usage = d.tokenUsage || {};
+    var pressure = d.contextPressure || {};
+    var stats = d.sessionStats || {};
+    var chips = [];
+    if (usage.outputTokens != null) chips.push("输出 " + fmtNum(usage.outputTokens));
+    if (usage.uncachedInputTokens != null) chips.push("输入 " + fmtNum(usage.uncachedInputTokens));
+    if (pressure.projectedTokens != null && pressure.contextWindow) {
+      chips.push("上下文 " + fmtNum(pressure.projectedTokens) + " / " + fmtNum(pressure.contextWindow));
+    }
+    if (stats.turns != null) chips.push("轮次 " + stats.turns);
+    var sel = d.modelSelection || S.selectedModel;
+    if (sel && sel.provider) chips.push(sel.provider + "/" + sel.model);
+    $("chips").innerHTML = chips.map(function (c) { return '<span class="chip">' + esc(c) + "</span>"; }).join("");
+  }
+
+  function msgNode(item) {
+    var kind = item.kind || "raw";
+    if (kind === "snapshot") return null;
+    if (kind === "delta") return null;
+    if (kind === "stream-start") return null;
+    if (kind === "stream-end") return null;
+    if (kind === "block-start" || kind === "block-end") return null;
+
+    var who = { user: "你", assistant: "DSH", "tool-call": "工具调用", "tool-result": "工具结果", status: "·", raw: "事件" }[kind] || kind;
+    var cls = kind === "user" ? "user" : kind === "assistant" ? "assistant" : (kind === "status" || kind === "raw") ? "meta" : "tool";
+
+    var body = "";
+    if (kind === "assistant") {
+      if (item.reasoning) body += '<div class="reasoning">' + esc(item.reasoning) + "</div>";
+      if (item.text) body += esc(item.text);
+      if (item.tools && item.tools.length) {
+        body += '<div class="tools">' + item.tools.map(function (t) {
+          return '<div class="tool-call"><b>' + esc(t.name) + "</b> " + esc(String(t.arguments || "").slice(0, 400)) + "</div>";
+        }).join("") + "</div>";
+      }
+    } else if (kind === "tool-call") {
+      body = '<b style="color:var(--primary)">' + esc(item.name) + "</b> " + esc(String(item.arguments || "").slice(0, 1200));
+    } else {
+      body = esc(item.text || "");
+    }
+    if (!body) return null;
+
+    var el = document.createElement("div");
+    el.className = "msg " + cls;
+    if (cls === "meta") {
+      el.innerHTML = '<div class="bubble">' + body + "</div>";
+    } else {
+      el.innerHTML = '<div class="who">' + esc(who) + "</div><div class=\"bubble\">" + body + "</div>";
+    }
+    return el;
+  }
+
+  function sizeText(n) {
+    var v = Number(n || 0);
+    if (v < 1024) return v + " B";
+    if (v < 1024 * 1024) return (v / 1024).toFixed(1) + " KB";
+    if (v < 1024 * 1024 * 1024) return (v / 1048576).toFixed(1) + " MB";
+    return (v / 1073741824).toFixed(1) + " GB";
+  }
+
+  function mergeFiles(list) {
+    if (!list || !list.length) return;
+    for (var i = 0; i < list.length; i++) {
+      var item = list[i];
+      var dup = false;
+      for (var j = 0; j < S.files.length; j++) if (S.files[j].path === item.path) { dup = true; break; }
+      if (!dup) S.files.push(item);
+    }
+    renderFiles();
+  }
+
+  function renderFiles() {
+    var box = $("files");
+    box.innerHTML = "";
+    if (!S.files.length) { box.style.display = "none"; return; }
+    box.style.display = "flex";
+    var label = document.createElement("span");
+    label.className = "files-label";
+    label.textContent = "生成的文件";
+    box.appendChild(label);
+    for (var i = 0; i < S.files.length; i++) {
+      (function (item) {
+        var chip = document.createElement("button");
+        chip.className = "file-chip";
+        chip.title = item.path + "（点击发送到当前对话）";
+        chip.innerHTML = '<span class="file-name">' + esc(item.name) + "</span>" +
+          '<span class="file-size">' + esc(sizeText(item.size)) + "</span>";
+        chip.onclick = function () { sendFile(item); };
+        box.appendChild(chip);
+      })(S.files[i]);
+    }
+  }
+
+  async function sendFile(item) {
+    if (!S.current) return;
+    try {
+      var res = await a("sendFile", { session_id: S.current, path: item.path });
+      if (res && res.ok === false) {
+        banner("bad", (res.error && res.error.message) || "发送失败");
+        return;
+      }
+      banner("ok", "已发送：" + item.name);
+    } catch (err) {
+      banner("bad", String((err && err.message) || err));
+    }
+  }
+
+  function renderTranscript() {
+    var host = $("transcript");
+    host.innerHTML = "";
+    if (!S.current) {
+      host.innerHTML = '<div class="empty"><h2>选择一个 DSH 会话</h2>' +
+        '<p>在左侧挑选会话即可查看历史并实时跟随生成过程；也可以点右上角「新建会话」。</p>' +
+        '<p>连接地址可在插件配置 <code>config.toml</code> 的 <code>[connection] base_url</code> 修改。</p></div>';
+      return;
+    }
+    var frag = document.createDocumentFragment();
+    for (var i = 0; i < S.messages.length; i++) {
+      var node = msgNode(S.messages[i]);
+      if (node) frag.appendChild(node);
+    }
+    var live = $("live-bubble");
+    if (live) frag.appendChild(live);
+    host.appendChild(frag);
+    host.scrollTop = host.scrollHeight;
+  }
+
+  function appendLive(text) {
+    var host = $("transcript");
+    var el = $("live-bubble");
+    if (!el) {
+      el = document.createElement("div");
+      el.className = "msg assistant";
+      el.id = "live-bubble";
+      el.innerHTML = '<div class="who">DSH</div><div class="bubble"></div>';
+      host.appendChild(el);
+    }
+    el.querySelector(".bubble").textContent += text;
+    host.scrollTop = host.scrollHeight;
+  }
+
+  function clearLive() {
+    var el = $("live-bubble");
+    if (el) el.remove();
+  }
+
+  function applyFrame(frame) {
+    var kind = frame.kind;
+    if (kind === "snapshot") {
+      S.messages = frame.messages || [];
+      clearLive();
+      renderTranscript();
+      return;
+    }
+    if (kind === "delta") { appendLive(frame.text || ""); return; }
+    if (kind === "stream-start") { clearLive(); return; }
+    if (kind === "stream-end") { clearLive(); return; }
+    if (kind === "block-start" || kind === "block-end") return;
+    if (kind === "files") { mergeFiles(frame.files); return; }
+    if (kind === "assistant") { clearLive(); }
+    if (kind) {
+      S.messages.push(frame);
+      renderTranscript();
+    }
+  }
+
+  // --------------------------------------------------------------- 数据
+
+  async function refreshStatus() {
+    try {
+      var st = await q("status");
+      S.status = st;
+      if (st && st.ok !== false && st.reachable) {
+        setDot("ok");
+        $("endpoint").textContent = st.base_url + " · " + (st.session_count != null ? st.session_count + " 个会话" : "已连接");
+        S.streamSupported = !!st.stream_support;
+        S.allowWrite = !!st.allow_write;
+        if (!S.streamSupported) banner("info", "当前 Python 环境缺少 WebSocket 支持，实时跟随不可用（仍可查看历史与发送消息）。");
+        else banner("", "");
+      } else {
+        setDot("bad");
+        var err = st && st.error ? (st.error.message || st.error.code) : "连接失败";
+        $("endpoint").textContent = (st && st.base_url) || "未连接";
+        banner("err", "无法连接 DSH：" + err + "　请确认 DSH 已启动，或检查插件配置里的 base_url。");
+      }
+    } catch (e) {
+      setDot("bad");
+      banner("err", "读取连接状态失败：" + (e && e.message ? e.message : e));
+    }
+  }
+
+  async function refreshSessions() {
+    try {
+      var data = await q("sessions", { query: $("search").value || "" });
+      if (data && data.ok === false) { banner("err", "读取会话列表失败：" + (data.error.message || data.error.code)); return; }
+      S.sessions = (data && data.items) || [];
+      renderSessions();
+    } catch (e) {
+      banner("err", "读取会话列表失败：" + (e && e.message ? e.message : e));
+    }
+  }
+
+  async function loadModels() {
+    try {
+      var data = await q("models");
+      if (!data || data.ok === false) return;
+      S.models = data;
+      var sel = $("model-select");
+      var html = '<option value="">模型…</option>';
+      (data.groups || []).forEach(function (g) {
+        html += '<optgroup label="' + esc(g.name) + '">';
+        (g.models || []).forEach(function (m) {
+          html += '<option value="' + esc(g.id + "||" + m.id) + '" data-group="' + esc(g.id) + '">' + esc(m.name) + "</option>";
+        });
+        html += "</optgroup>";
+      });
+      sel.innerHTML = html;
+      if (data.default && data.default.provider) {
+        S.selectedModel = data.default.provider + "||" + data.default.model;
+        sel.value = S.selectedModel;
+        if (data.default.reasoningEffort) {
+          S.selectedEffort = data.default.reasoningEffort;
+        }
+      }
+      updateEfforts();
+    } catch (e) { /* 忽略 */ }
+  }
+
+  function updateEfforts() {
+    var sel = $("effort-select");
+    var val = $("model-select").value;
+    var efforts = [];
+    if (S.models && val) {
+      var parts = val.split("||");
+      (S.models.groups || []).forEach(function (g) {
+        if (g.id !== parts[0]) return;
+        (g.models || []).forEach(function (m) {
+          if (m.id === parts[1]) efforts = m.efforts || [];
+        });
+      });
+    }
+    if (!efforts.length) { sel.style.display = "none"; sel.innerHTML = ""; return; }
+    sel.style.display = "";
+    sel.innerHTML = '<option value="">默认强度</option>' + efforts.map(function (e) {
+      return '<option value="' + esc(e.id) + '">' + esc(e.name) + "</option>";
+    }).join("");
+    if (S.selectedEffort) sel.value = S.selectedEffort;
+  }
+
+  async function loadPresets() {
+    try {
+      var data = await q("presets");
+      if (!data || data.ok === false) return;
+      S.presets = data.presets || [];
+      $("new-preset").innerHTML = '<option value="">默认</option>' + S.presets.map(function (p) {
+        return '<option value="' + esc(p.id) + '">' + esc(p.id) + (p.isDefault ? "（默认）" : "") + "</option>";
+      }).join("");
+    } catch (e) { /* 忽略 */ }
+  }
+
+  // --------------------------------------------------------------- 会话
+
+  async function selectSession(id, title) {
+    if (!id) return;
+    S.gen += 1;
+    var gen = S.gen;
+    S.current = id;
+    S.messages = [];
+    S.files = [];
+    renderFiles();
+    S.cursor = 0;
+    S.hasMore = false;
+    S.earliest = 0;
+    S.detail = null;
+    clearLive();
+    $("title").textContent = title || id;
+    $("chips").innerHTML = "";
+    $("input").disabled = !S.allowWrite;
+    $("btn-send").disabled = !S.allowWrite;
+    $("btn-cancel").disabled = false;
+    $("btn-stop").disabled = false;
+    $("btn-rename").disabled = false;
+    $("model-select").disabled = false;
+    $("hint").textContent = "就绪";
+    renderSessions();
+    renderTranscript();
+
+    // 1) 历史消息（先给个底）
+    try {
+      var hist = await q("messages", { session_id: id, limit: 60 });
+      if (gen === S.gen && hist && hist.ok !== false) {
+        S.messages = hist.messages || [];
+    S.files = hist.files || [];
+    renderFiles();
+        S.hasMore = !!hist.has_more;
+        S.earliest = hist.earliest_seq || 0;
+        renderTranscript();
+        updateEarlier();
+      }
+    } catch (e) { /* 忽略 */ }
+
+    // 2) 详情投影
+    try {
+      var det = await q("detail", { session_id: id });
+      if (gen === S.gen && det && det.ok !== false) {
+        S.detail = det;
+        renderChips();
+      }
+    } catch (e) { /* 忽略 */ }
+
+    // 3) 打开实时流
+    if (S.streamSupported) {
+      try {
+        await a("open", { session_id: id });
+        if (gen === S.gen) startPolling(id);
+      } catch (e) {
+        if (gen === S.gen) $("stream-state").textContent = "实时流不可用";
+      }
+    } else {
+      $("stream-state").textContent = "仅历史模式";
+    }
+  }
+
+  function updateEarlier() {
+    var btn = $("btn-earlier");
+    if (!btn) return;
+    btn.style.display = S.hasMore && S.current ? "" : "none";
+  }
+
+  async function loadEarlier() {
+    if (!S.current || !S.hasMore) return;
+    var btn = $("btn-earlier");
+    var gen = S.gen;
+    btn.disabled = true;
+    try {
+      var res = await q("messages", { session_id: S.current, limit: 60, before_seq: S.earliest || 0 });
+      if (gen === S.gen && res && res.ok !== false) {
+        var older = res.messages || [];
+        S.messages = older.concat(S.messages);
+        S.hasMore = !!res.has_more;
+        if (res.earliest_seq) S.earliest = res.earliest_seq;
+        renderTranscript();
+        var host = $("transcript");
+        host.scrollTop = 0;
+      }
+    } catch (e) { /* 忽略 */ }
+    btn.disabled = false;
+    updateEarlier();
+  }
+
+  function startPolling(id) {
+    stopPolling();
+    $("stream-state").textContent = "实时跟随中";
+    var tick = async function () {
+      if (S.current !== id) return;
+      try {
+        var data = await q("poll", { session_id: id, cursor: S.cursor });
+        if (S.current !== id) return;
+        if (data && data.ok !== false) {
+          S.cursor = data.cursor || S.cursor;
+          var frames = data.frames || [];
+          for (var i = 0; i < frames.length; i++) applyFrame(frames[i]);
+          $("stream-state").textContent = data.status === "live" ? "实时跟随中"
+            : data.status === "error" ? "流中断：" + (data.error || "")
+            : data.status === "closed" ? "已停止" : "连接中…";
+        }
+      } catch (e) {
+        $("stream-state").textContent = "轮询失败";
+      }
+      S.pollTimer = setTimeout(tick, 1200);
+    };
+    S.pollTimer = setTimeout(tick, 500);
+  }
+
+  function stopPolling() {
+    if (S.pollTimer) { clearTimeout(S.pollTimer); S.pollTimer = null; }
+  }
+
+  async function sendMessage() {
+    var text = $("input").value.trim();
+    if (!text || !S.current) return;
+    $("btn-send").disabled = true;
+    $("hint").textContent = "发送中…";
+    try {
+      var res = await a("prompt", { session_id: S.current, text: text, mode: "queue" });
+      if (res && res.ok === false) {
+        banner("err", "发送失败：" + (res.error.message || res.error.code));
+      } else {
+        $("input").value = "";
+        banner("", "");
+        S.messages.push({ kind: "user", text: text });
+        renderTranscript();
+      }
+    } catch (e) {
+      banner("err", "发送失败：" + (e && e.message ? e.message : e));
+    }
+    $("hint").textContent = "就绪";
+    $("btn-send").disabled = !S.allowWrite;
+  }
+
+  // --------------------------------------------------------------- 事件绑定
+
+  function bind() {
+    $("btn-refresh").addEventListener("click", function () { refreshSessions(); refreshStatus(); });
+  $("btn-earlier").addEventListener("click", loadEarlier);
+    $("btn-test").addEventListener("click", async function () {
+      setDot("busy");
+      $("endpoint").textContent = "测试中…";
+      try {
+        var res = await a("test", {});
+        if (res && res.ok === false) {
+          setDot("bad");
+          $("endpoint").textContent = (res.error && res.error.message) || "测试失败";
+          banner("err", "连接测试失败：" + ((res.error && res.error.message) || ""));
+        } else {
+          setDot("ok");
+          $("endpoint").textContent = res.base_url + " · " + res.session_count + " 个会话 · " + res.latency_ms + "ms";
+          banner("", "");
+        }
+      } catch (e) {
+        setDot("bad");
+        banner("err", "连接测试失败：" + (e && e.message ? e.message : e));
+      }
+      refreshSessions();
+    });
+
+    var searchTimer = null;
+    $("search").addEventListener("input", function () {
+      if (searchTimer) clearTimeout(searchTimer);
+      searchTimer = setTimeout(refreshSessions, 300);
+    });
+
+    $("btn-new").addEventListener("click", function () { $("dlg-new").showModal(); });
+    $("new-cancel").addEventListener("click", function () { $("dlg-new").close(); });
+    $("new-ok").addEventListener("click", async function () {
+      $("dlg-new").close();
+      try {
+        var res = await a("create", {
+          cwd: $("new-cwd").value.trim(),
+          agent_preset: $("new-preset").value
+        });
+        if (res && res.ok === false) {
+          banner("err", "新建会话失败：" + (res.error.message || res.error.code));
+          return;
+        }
+        await refreshSessions();
+        var newId = res && res.result && res.result.sessionId;
+        if (newId) selectSession(newId, "新会话");
+      } catch (e) {
+        banner("err", "新建会话失败：" + (e && e.message ? e.message : e));
+      }
+    });
+
+    $("btn-rename").addEventListener("click", function () {
+      if (!S.current) return;
+      $("rename-title").value = $("title").textContent || "";
+      $("dlg-rename").showModal();
+    });
+    $("rename-cancel").addEventListener("click", function () { $("dlg-rename").close(); });
+    $("rename-ok").addEventListener("click", async function () {
+      $("dlg-rename").close();
+      if (!S.current) return;
+      var title = $("rename-title").value.trim();
+      if (!title) return;
+      try {
+        var res = await a("rename", { session_id: S.current, title: title });
+        if (res && res.ok === false) { banner("err", "重命名失败：" + (res.error.message || res.error.code)); return; }
+        $("title").textContent = title;
+        refreshSessions();
+      } catch (e) {
+        banner("err", "重命名失败：" + (e && e.message ? e.message : e));
+      }
+    });
+
+    $("btn-stop").addEventListener("click", async function () {
+      if (!S.current) return;
+      if (!confirm("确定要停止当前会话吗？会中断生成并清空排队消息。")) return;
+      $("btn-stop").disabled = true;
+      try {
+        var res = await a("stop", { session_id: S.current, clear_queue: true });
+        if (res && res.ok === false) {
+          banner("err", "停止失败：" + (res.error.message || res.error.code));
+        } else {
+          var removed = (res && res.cleared && res.cleared.removed) || 0;
+          banner("ok", removed ? ("已停止当前会话，清掉 " + removed + " 条排队消息") : "已停止当前会话");
+          clearLive();
+          await refreshSessions();
+        }
+      } catch (e) {
+        banner("err", "停止失败：" + (e && e.message ? e.message : e));
+      }
+      $("btn-stop").disabled = false;
+    });
+
+    $("btn-cancel").addEventListener("click", async function () {
+      if (!S.current) return;
+      if (!confirm("确定要中断当前生成吗？")) return;
+      try {
+        var res = await a("cancel", { session_id: S.current });
+        if (res && res.ok === false) banner("err", "中断失败：" + (res.error.message || res.error.code));
+      } catch (e) {
+        banner("err", "中断失败：" + (e && e.message ? e.message : e));
+      }
+    });
+
+    $("model-select").addEventListener("change", function () {
+      S.selectedModel = this.value;
+      updateEfforts();
+      if (!S.current || !S.selectedModel) return;
+      var parts = S.selectedModel.split("||");
+      applyModel(parts[0], parts[1], "");
+    });
+    $("effort-select").addEventListener("change", function () {
+      S.selectedEffort = this.value;
+      if (!S.current || !S.selectedModel) return;
+      var parts = S.selectedModel.split("||");
+      applyModel(parts[0], parts[1], this.value);
+    });
+
+    $("btn-send").addEventListener("click", sendMessage);
+
+    $("btn-tunnel").addEventListener("click", function () {
+      $("dlg-tunnel").showModal();
+      refreshTunnel();
+    });
+    $("tunnel-close").addEventListener("click", function () { $("dlg-tunnel").close(); });
+    $("tunnel-copy").addEventListener("click", function () {
+      var field = $("tunnel-url");
+      if (!field.value) return;
+      field.select();
+      $("tunnel-note").textContent = "已选中地址，按 Ctrl+C 复制";
+    });
+    $("tunnel-start").addEventListener("click", async function () {
+      this.disabled = true;
+      $("tunnel-badge").textContent = "启动中…";
+      try {
+        var res = await a("tunnelStart", {});
+        if (res && res.ok === false) {
+          banner("err", "隧道启动失败：" + (res.error.message || res.error.code));
+        } else {
+          banner("", "");
+        }
+      } catch (e) {
+        banner("err", "隧道启动失败：" + (e && e.message ? e.message : e));
+      }
+      await refreshTunnel();
+    });
+    $("tunnel-stop").addEventListener("click", async function () {
+      if (!confirm("确定要关闭公网隧道吗？关闭后外网将无法访问。")) return;
+      try {
+        await a("tunnelStop", {});
+      } catch (e) {
+        banner("err", "隧道停止失败：" + (e && e.message ? e.message : e));
+      }
+      await refreshTunnel();
+    });
+    async function switchEndpoint(mode) {
+      try {
+        var res = await a("switchEndpoint", { mode: mode });
+        if (res && res.ok === false) {
+          banner("err", "切换失败：" + (res.error.message || res.error.code));
+        } else {
+          banner("ok", "已切换到 " + (mode === "public" ? "公网地址" : "内网地址") + "：" + ((res && res.base_url) || ""));
+        }
+      } catch (e) {
+        banner("err", "切换失败：" + (e && e.message ? e.message : e));
+      }
+      await refreshTunnel();
+    }
+    $("tunnel-use-direct").addEventListener("click", function () { switchEndpoint("direct"); });
+    $("tunnel-use-public").addEventListener("click", function () { switchEndpoint("public"); });
+    $("tunnel-start-lan").addEventListener("click", async function () {
+      var btn = $("tunnel-start-lan");
+      btn.disabled = true;
+      try {
+        var res = await a("switchEndpoint", { mode: "lan" });
+        if (res && res.ok === false) banner("err", "内网通道启动失败：" + (res.error.message || res.error.code));
+        else banner("ok", "内网通道已启动");
+      } catch (e) {
+        banner("err", "内网通道启动失败：" + (e && e.message ? e.message : e));
+      }
+      btn.disabled = false;
+      await refreshTunnel();
+    });
+    $("input").addEventListener("keydown", function (ev) {
+      if (ev.key === "Enter" && !ev.shiftKey) {
+        ev.preventDefault();
+        sendMessage();
+      }
+    });
+  }
+
+  async function applyModel(provider, model, effort) {
+    try {
+      var res = await a("selectModel", {
+        session_id: S.current,
+        provider: provider,
+        model: model,
+        reasoning_effort: effort || ""
+      });
+      if (res && res.ok === false) {
+        banner("err", "切换模型失败：" + (res.error.message || res.error.code));
+      } else {
+        banner("", "");
+        $("hint").textContent = "已切换模型";
+        setTimeout(function () { $("hint").textContent = "就绪"; }, 1800);
+      }
+    } catch (e) {
+      banner("err", "切换模型失败：" + (e && e.message ? e.message : e));
+    }
+  }
+
+  // ------------------------------------------------------------- 公网隧道
+
+  async function refreshTunnel() {
+    try {
+      var st = await q("tunnel", {});
+      var state = (st && st.state) || "stopped";
+      var badge = $("tunnel-badge");
+      badge.textContent =
+        state === "running" ? "运行中" :
+        state === "starting" ? "启动中…" :
+        state === "error" ? "出错" : "未启动";
+      $("tunnel-url").value = (st && st.public_url) || "";
+      var ep = (st && st.endpoints) || {};
+      $("tunnel-direct").value = ep.direct || "";
+      $("tunnel-lan").value = ep.lan || "";
+      $("tunnel-local").value = ep.proxy || (st && st.local_url) || "";
+      var modeNames = { direct: "内网直连", lan: "内网共享", public: "公网地址", custom: "自定义" };
+      $("tunnel-mode").textContent = "连接：" + (modeNames[st && st.mode] || "内网直连");
+      $("tunnel-use-public").disabled = !(st && st.public_ready);
+      $("tunnel-start").disabled = state === "running" || state === "starting";
+      $("tunnel-stop").disabled = state !== "running" && state !== "starting";
+
+      var wl = await q("whitelist", {});
+      var box = $("tunnel-whitelist");
+      box.innerHTML = "";
+      var numbers = (wl && wl.qq_numbers) || [];
+      var extra = (wl && wl.runtime_extra) || [];
+      var admins = (wl && wl.admins) || [];
+      var all = numbers.concat(extra.filter(function (n) { return numbers.indexOf(n) < 0; }));
+      if (!all.length) {
+        box.textContent = "未配置（config.toml → [whitelist] qq_numbers）";
+      } else {
+        all.forEach(function (n) {
+          var span = document.createElement("span");
+          span.className = "chip";
+          span.textContent = n + (admins.indexOf(n) >= 0 ? " · 管理员" : "");
+          box.appendChild(span);
+        });
+      }
+      var note = (st && st.error) || "";
+      if (st && st.running && st.public_url && !st.public_reachable) note = "公网域名生效中，稍后即可访问";
+      if (st && st.running && st.public_reachable) note = "公网地址可用";
+      $("tunnel-note").textContent =
+        (wl && wl.enabled === false) ? "白名单已关闭（所有人可用）" : note;
+    } catch (e) {
+      banner("err", "读取隧道状态失败：" + (e && e.message ? e.message : e));
+    }
+  }
+
+  // --------------------------------------------------------------- 启动
+
+  async function boot() {
+    try {
+      var ctx = await api.ready;
+      if (ctx && ctx.theme === "dark") document.documentElement.classList.add("dark");
+    } catch (e) { /* 忽略 */ }
+
+    bind();
+    await refreshStatus();
+    await loadModels();
+    await loadPresets();
+    await refreshSessions();
+
+    // 定时轻量同步会话列表状态
+    setInterval(function () {
+      if (document.hidden) return;
+      refreshSessions();
+    }, 8000);
+  }
+
+  boot();
+})();
+</script>
+</body>
+</html>

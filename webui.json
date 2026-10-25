@@ -1,0 +1,286 @@
+{
+  "schema_version": 2,
+  "required_capabilities": [
+    "custom_pages"
+  ],
+  "workspace_title": "DSH 远程桥接",
+  "pages": [
+    {
+      "id": "console",
+      "title": "DSH 控制台",
+      "description": "连接 DeepSeek Harness，浏览会话、收发消息、实时跟随生成过程。",
+      "placement": "sidebar",
+      "icon": "puzzle",
+      "mode": "custom",
+      "entry": "webui/index.html",
+      "layout": "viewport",
+      "queries": {
+        "status": {
+          "api": "bridge_status",
+          "version": "1"
+        },
+        "sessions": {
+          "api": "list_sessions",
+          "version": "1",
+          "parameters": {
+            "query": {
+              "type": "string",
+              "required": false,
+              "max_length": 200
+            }
+          }
+        },
+        "detail": {
+          "api": "session_detail",
+          "version": "1",
+          "parameters": {
+            "session_id": {
+              "type": "string",
+              "required": true,
+              "max_length": 200
+            }
+          }
+        },
+        "messages": {
+          "api": "session_messages",
+          "version": "1",
+          "parameters": {
+            "session_id": {
+              "type": "string",
+              "required": true,
+              "max_length": 200
+            },
+            "limit": {
+              "type": "integer",
+              "required": false,
+              "minimum": 1,
+              "maximum": 400
+            },
+            "before_seq": {
+              "type": "integer",
+              "required": false,
+              "minimum": 0
+            }
+          }
+        },
+        "models": {
+          "api": "model_catalog",
+          "version": "1"
+        },
+        "presets": {
+          "api": "agent_presets",
+          "version": "1"
+        },
+        "poll": {
+          "api": "stream_poll",
+          "version": "1",
+          "parameters": {
+            "session_id": {
+              "type": "string",
+              "required": true,
+              "max_length": 200
+            },
+            "cursor": {
+              "type": "integer",
+              "required": false,
+              "minimum": 0
+            }
+          }
+        },
+        "tunnel": {
+          "api": "tunnel_status",
+          "version": "1"
+        },
+        "whitelist": {
+          "api": "whitelist_overview",
+          "version": "1"
+        }
+      },
+      "actions": {
+        "open": {
+          "api": "stream_open",
+          "version": "1",
+          "parameters": {
+            "session_id": {
+              "type": "string",
+              "required": true,
+              "max_length": 200
+            }
+          }
+        },
+        "close": {
+          "api": "stream_close",
+          "version": "1",
+          "parameters": {
+            "session_id": {
+              "type": "string",
+              "required": true,
+              "max_length": 200
+            }
+          }
+        },
+        "prompt": {
+          "api": "session_prompt",
+          "version": "1",
+          "parameters": {
+            "session_id": {
+              "type": "string",
+              "required": true,
+              "max_length": 200
+            },
+            "text": {
+              "type": "string",
+              "required": true,
+              "max_length": 60000
+            },
+            "mode": {
+              "type": "string",
+              "required": false,
+              "max_length": 16
+            }
+          }
+        },
+        "cancel": {
+          "api": "session_cancel",
+          "version": "1",
+          "parameters": {
+            "session_id": {
+              "type": "string",
+              "required": true,
+              "max_length": 200
+            }
+          }
+        },
+        "stop": {
+          "api": "session_stop",
+          "version": "1",
+          "parameters": {
+            "session_id": {
+              "type": "string",
+              "required": true,
+              "max_length": 200
+            },
+            "clear_queue": {
+              "type": "boolean",
+              "required": false
+            }
+          }
+        },
+        "create": {
+          "api": "session_create",
+          "version": "1",
+          "parameters": {
+            "cwd": {
+              "type": "string",
+              "required": false,
+              "max_length": 500
+            },
+            "agent_preset": {
+              "type": "string",
+              "required": false,
+              "max_length": 100
+            }
+          }
+        },
+        "rename": {
+          "api": "session_rename",
+          "version": "1",
+          "parameters": {
+            "session_id": {
+              "type": "string",
+              "required": true,
+              "max_length": 200
+            },
+            "title": {
+              "type": "string",
+              "required": true,
+              "max_length": 200
+            }
+          }
+        },
+        "selectModel": {
+          "api": "select_model",
+          "version": "1",
+          "parameters": {
+            "session_id": {
+              "type": "string",
+              "required": true,
+              "max_length": 200
+            },
+            "provider": {
+              "type": "string",
+              "required": true,
+              "max_length": 100
+            },
+            "model": {
+              "type": "string",
+              "required": true,
+              "max_length": 200
+            },
+            "reasoning_effort": {
+              "type": "string",
+              "required": false,
+              "max_length": 40
+            }
+          }
+        },
+        "test": {
+          "api": "test_connection",
+          "version": "1",
+          "parameters": {
+            "base_url": {
+              "type": "string",
+              "required": false,
+              "max_length": 300
+            }
+          }
+        },
+        "tunnelStart": {
+          "api": "tunnel_start",
+          "version": "1"
+        },
+        "tunnelStop": {
+          "api": "tunnel_stop",
+          "version": "1"
+        },
+        "switchEndpoint": {
+          "api": "switch_endpoint",
+          "version": "1",
+          "parameters": {
+            "mode": {
+              "type": "string",
+              "required": true,
+              "choices": [
+                "direct",
+                "lan",
+                "public",
+                "custom"
+              ]
+            },
+            "url": {
+              "type": "string",
+              "required": false,
+              "max_length": 300
+            }
+          }
+        },
+        "sendFile": {
+          "api": "send_file",
+          "version": "1",
+          "parameters": {
+            "session_id": {
+              "type": "string",
+              "required": true,
+              "max_length": 200
+            },
+            "path": {
+              "type": "string",
+              "required": true,
+              "max_length": 1024
+            }
+          }
+        }
+      }
+    }
+  ]
+}
