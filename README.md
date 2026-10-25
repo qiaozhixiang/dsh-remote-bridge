@@ -19,6 +19,19 @@
 
 ## 安装
 
+### 方式一：从 GitHub Release 装（推荐）
+
+1. 打开 [Releases](https://github.com/qiaozhixiang/dsh-remote-bridge/releases)，下载最新版本的
+   `Source code (zip)`（GitHub 自动生成的源码包，无需额外构建）。
+2. 解压得到 `dsh-remote-bridge-<版本>/` 目录，整个放进 `<MaiBot>/plugins/`。
+3. 也可以直接用 MaiBot WebUI → 插件 → 从 ZIP 安装，选择刚下载的 zip。
+4. 重启 MaiBot。
+
+> ZIP 根目录必须能直接读到 `_manifest.json`；本仓库的自动源码包顶层只有一层
+> `dsh-remote-bridge-<版本>/`，符合 MaiBot 的安装规则。
+
+### 方式二：手工放目录
+
 1. 把整个 `dsh-remote-bridge` 目录放到：
 
    ```
@@ -30,7 +43,7 @@
    ```toml
    [plugin]
    enabled = true
-   config_version = "1.4.0"
+   config_version = "1.6.2"
 
    [connection]
    base_url = "http://127.0.0.1:3080"   # DSH Web 地址

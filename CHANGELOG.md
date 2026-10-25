@@ -1,3 +1,14 @@
+## 1.6.2
+
+### 修复
+
+- `config_version` 默认值与 `config.toml` 对齐到插件版本（原先模型默认 `1.0.0`、配置文件 `1.6.0`，两边不同会让 MaiBot 每次启动都判定「配置版本升级」并重写 `config.toml`，把用户手写的注释冲掉）。
+- `host_application.max_version` 从 `1.3.99` 放宽到 `999.999.999`：按 MaiBot 官方建议只认真约束 `min_version`，避免 Host 升级一个小版本插件就被判为不兼容而拒绝加载。
+
+### 文档
+
+- 安装章节补上「从 GitHub Release 装」的完整路径，并说明自动源码包的目录层级符合 MaiBot 的 ZIP 安装规则。
+
 ## 1.6.1
 
 ### 优化

@@ -3,7 +3,7 @@
 
 [plugin]
 enabled = true
-config_version = "1.6.0"
+config_version = "1.6.2"
 
 [connection]
 # DSH Web 地址；本机默认 3080，改动后需与 DSH 实际监听端口一致
